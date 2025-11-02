@@ -140,7 +140,7 @@ Bloom 的继任者是 2022 年的 StarCoder（[Li et al., 2023](https://arxiv.or
 
 除了迭代速度，数据整理（data curation） 无疑是 LLM 训练中最具影响力的环节。人们天然倾向于扎进架构选择以提升模型，但真正在 LLM 训练上出类拔萃的团队，无一不是对高质量数据近乎偏执。
 
-与迭代速度紧密相关的另一个因素是团队规模：对于主要的预训练任务，只需少数几人，配备足够算力即可。今天预训练一个 Llama 3 级别的模型，大概 2–3 人足矣。只有当你开始涉足更多样化的训练与下游任务（多模态、多语言、后训练等）时，才需要逐步增加人手，以在各领域做到极致。
+与迭代速度紧密相关的另一个因素是团队规模：对于主要的预训练任务，只需少数几人，配备足够算力即可。今天预训练一个 Llama 3 级别的模型，大概 $2–3$ 人足矣。只有当你开始涉足更多样化的训练与下游任务（多模态、多语言、后训练等）时，才需要逐步增加人手，以在各领域做到极致。
 
 所以，从一个装备精良的小团队起步，每 2–3 个月打造一个新模型，用不了多久你就能登顶。接下来，本文的其余部分将聚焦这支团队的日常技术实践！
 
@@ -264,7 +264,7 @@ Bloom 的继任者是 2022 年的 StarCoder（[Li et al., 2023](https://arxiv.or
 
 消融（ablation）的目标是在小规模上运行实验，并获得可以可靠外推到最终生产运行的结果。
 
-主要有两种方法。首先，我们可以采用目标模型规模，但只在更少的 token 上训练。对于 SmolLM3 的消融实验，我们在 100B 个 token 上训练了完整的 3B 模型，而不是最终的 11T。其次，如果目标模型太大，我们可以训练一个更小的代理（proxy）模型来做消融。例如，当 Kimi 开发其 1T 参数的 Kimi K2 模型（活跃参数 32B）时，用完整规模做所有消融实验的成本高得令人望而却步，因此他们在一个 3B 的 MoE（Mixture of Experts，混合专家）模型上运行了部分消融实验，该模型活跃参数仅为 0.5B（[Team et al., 2025](https://arxiv.org/abs/2507.20534)）。
+主要有两种方法。首先，我们可以采用目标模型规模，但只在更少的 token 上训练。对于 SmolLM3 的消融实验，我们在 $100B$ 个 token 上训练了完整的 $3B$ 模型，而不是最终的 $11T$。其次，如果目标模型太大，我们可以训练一个更小的代理（proxy）模型来做消融。例如，当 Kimi 开发其 $1T$ 参数的 Kimi K2 模型（活跃参数 $32B$）时，用完整规模做所有消融实验的成本高得令人望而却步，因此他们在一个 $3B$ 的 MoE（Mixture of Experts，混合专家）模型上运行了部分消融实验，该模型活跃参数仅为 $0.5B$（[Team et al., 2025](https://arxiv.org/abs/2507.20534)）。
 
 一个关键问题是，这些小规模的发现是否真的能够迁移。根据我们的经验，如果某件事在小规模上损害了性能，你可以自信地将其排除在大规模之外。但如果某件事在小规模上有效，你仍应确保在足够数量的 token 上进行了训练，以便以高概率断定这些发现可以外推到更大规模。训练时间越长，消融模型越接近最终模型，结果就越可靠。
 
@@ -464,9 +464,9 @@ def count_parameters(
 
 听起来显而易见，但正如我们在训练指南针中解释的，在此处的审慎思考会塑造后续决策，并防止我们在无尽的实验空间中迷失。我们是想打造一个英文 SOTA（state-of-the-art，最先进）模型？长上下文是否是优先事项？还是我们试图验证一种新架构？在这些情况下，训练循环可能看起来相似，但我们运行的实验以及愿意接受的权衡将有所不同。尽早回答这个问题，有助于我们决定如何在数据工作与架构工作之间分配时间，以及在开始训练前各自投入多少创新。
 
-因此，让我们以身作则，回顾指导 SmolLM3 设计的目标。我们希望得到一个适用于端侧应用的强模型，具备有竞争力的多语言性能、扎实的数学与编程能力，以及稳健的长上下文处理能力。如前所述，这促使我们选择了 30 亿（3B）参数的稠密（dense）模型：足够大以获得强劲能力，又足够小以舒适地运行在手机上。鉴于边缘设备的内存限制以及我们的项目周期（约 3 个月），我们选择了稠密 Transformer，而非 MoE（Mixture of Experts，混合专家）或 Hybrid（混合）架构。
+因此，让我们以身作则，回顾指导 SmolLM3 设计的目标。我们希望得到一个适用于端侧应用的强模型，具备有竞争力的多语言性能、扎实的数学与编程能力，以及稳健的长上下文处理能力。如前所述，这促使我们选择了 30 亿（$3B$）参数的稠密（dense）模型：足够大以获得强劲能力，又足够小以舒适地运行在手机上。鉴于边缘设备的内存限制以及我们的项目周期（约 3 个月），我们选择了稠密 Transformer，而非 MoE（Mixture of Experts，混合专家）或 Hybrid（混合）架构。
 
-我们手上有 SmolLM2 在较小规模（1.7B 参数）下针对英文的成熟配方，但放大模型规模意味着要重新验证所有环节，并迎接多语言（multilinguality）和更长上下文长度（extended context length）等新挑战。一个具体例子足以说明“明确目标”如何左右我们的策略：在 SmolLM2 中，我们直到预训练尾声才尝试扩展上下文长度，结果举步维艰；因此在 SmolLM3 中，我们从一开始就做了架构层面的选择——例如采用 NoPE（NoPE）以及 intra-document masking（文档内掩码，详见后文）——以最大化成功概率，最终奏效。
+我们手上有 SmolLM2 在较小规模（$1.7B$ 参数）下针对英文的成熟配方，但放大模型规模意味着要重新验证所有环节，并迎接多语言（multilinguality）和更长上下文长度（extended context length）等新挑战。一个具体例子足以说明“明确目标”如何左右我们的策略：在 SmolLM2 中，我们直到预训练尾声才尝试扩展上下文长度，结果举步维艰；因此在 SmolLM3 中，我们从一开始就做了架构层面的选择——例如采用 NoPE（NoPE）以及 intra-document masking（文档内掩码，详见后文）——以最大化成功概率，最终奏效。
 
 目标一旦清晰，我们就可以着手做出能够实现这些目标的技术决策。本章将系统梳理我们在三大核心决策上的方法论：架构（architecture）、数据（data）和超参数（hyperparameters）。可以把这看作战略规划阶段——把这些基础打牢，就能在真正的训练马拉松中避免代价高昂的错误。
 
@@ -480,14 +480,14 @@ def count_parameters(
 
 | 模型 | 架构 | 参数量 | 训练 token 数 | 注意力机制 | 上下文长度（最终） | 位置编码 | 精度 | 初始化（标准差） | 优化器 | 最大学习率 | 学习率调度 | 预热步数 | 批量大小 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| DeepSeek LLM 7B | Dense | 7B | 2T | GQA | 4K | RoPE | BF16 | 0.006 | AdamW | 4.2×10⁻⁴ | Multi-Step | 2K | 9.4M |
-| DeepSeek LLM 67B | Dense | 67B | 2T | GQA | 4K | RoPE | BF16 | 0.006 | AdamW | 3.2×10⁻⁴ | Multi-Step | 2K | 18.9M |
-| DeepSeek V2 | MoE | 236B（21B 激活） | 8.1T | MLA | 128K | Partial RoPE | — | 0.006 | AdamW | 2.4×10⁻⁴ | Multi-Step | 2K | 9.4M→37.7M（预热 225B） |
-| DeepSeek V3 | MoE | 671B（37B 激活） | 14.8T | MLA | 129K | Partial RoPE | FP8 | 0.006 | AdamW | 2.2×10⁻⁴ | Multi-Step + Cosine | 2K | 12.6M→62.9M（预热 469B） |
-| MiniMax-01 | MoE + Hybrid | 456B（45.9B 激活） | 11.4T | Linear attention + GQA | 4M | Partial RoPE | — | Xavier init + deepnorm scaling | AdamW | 2×10⁻⁴ | Multi-Step | 500 | 16M→32M→64M→128M |
-| Kimi K2 | MoE | 1T（32B 激活） | 15.5T | MLA | 128K | Partial RoPE | BF16 | 约 0.006 | MuonClip | 2×10⁻⁴ | WSD | 500 | 67M |
-| OLMo 2 7B | Dense | 7B | 5T | MHA | 4K | RoPE | BF16 | 0.02 | AdamW | 3×10⁻⁴ | Cosine | 2K | 4.2M |
-| SmolLM3 | Dense | 3B | 11T | GQA | 128K | NoPE | BF16 | 0.02 | AdamW | 2×10⁻⁴ | WSD | 2K | 2.3M |
+| DeepSeek LLM 7B | Dense | 7B | 2T | GQA | 4K | RoPE | BF16 | 0.006 | AdamW | $4.2 \times 10^{-4}$ | Multi-Step | 2K | 9.4M |
+| DeepSeek LLM 67B | Dense | 67B | 2T | GQA | 4K | RoPE | BF16 | 0.006 | AdamW | $3.2 \times 10^{-4}$ | Multi-Step | 2K | 18.9M |
+| DeepSeek V2 | MoE | 236B（21B 激活） | 8.1T | MLA | 128K | Partial RoPE | — | 0.006 | AdamW | $2.4 \times 10^{-4}$ | Multi-Step | 2K | 9.4M→37.7M（预热 225B） |
+| DeepSeek V3 | MoE | 671B（37B 激活） | 14.8T | MLA | 129K | Partial RoPE | FP8 | 0.006 | AdamW | $2.2 \times 10^{-4}$ | Multi-Step + Cosine | 2K | 12.6M→62.9M（预热 469B） |
+| MiniMax-01 | MoE + Hybrid | 456B（45.9B 激活） | 11.4T | Linear attention + GQA | 4M | Partial RoPE | — | Xavier init + deepnorm scaling | AdamW | $2 \times 10^{-4}$ | Multi-Step | 500 | 16M→32M→64M→128M |
+| Kimi K2 | MoE | 1T（32B 激活） | 15.5T | MLA | 128K | Partial RoPE | BF16 | 约 0.006 | MuonClip | $2 \times 10^{-4}$ | WSD | 500 | 67M |
+| OLMo 2 7B | Dense | 7B | 5T | MHA | 4K | RoPE | BF16 | 0.02 | AdamW | $3 \times 10^{-4}$ | Cosine | 2K | 4.2M |
+| SmolLM3 | Dense | 3B | 11T | GQA | 128K | NoPE | BF16 | 0.02 | AdamW | $2 \times 10^{-4}$ | WSD | 2K | 2.3M |
 
 如果你现在还不理解其中的一些术语，比如 MLA、NoPE 或 WSD，别担心。我们会在本节逐一解释。此刻只需留意它们的多样性：不同的注意力机制（MHA、GQA、MLA）、位置编码（RoPE、NoPE、Partial RoPE）以及学习率调度策略（Cosine、Multi-Step、WSD）。
 
@@ -503,17 +503,21 @@ Transformer 架构中最活跃的研究领域之一就是注意力机制。虽�
 
 我的注意力需要多少个头？
 
-_多头注意力（Multi-head attention，MHA）_ 是最初的 Transformer 论文（[Vaswani et al., 2023](https://arxiv.org/abs/1706.03762)）中提出的标准注意力机制。其核心思想是：你有 N 个注意力头，每个头独立执行相同的检索任务——将隐藏状态转换为查询（queries）、键（keys）和值（values），然后利用当前查询通过与键的匹配来检索最相关的 token，最后将匹配到的 token 对应的值向前传递。在推理阶段，我们无需重新计算过去 token 的 KV 值，而是可以复用它们。用于存储过去 KV 值的内存称为 _KV-Cache_。随着上下文窗口的增长，该缓存很快就会成为推理瓶颈，并占用大量 GPU 显存。下面是一个简单计算，用于估算在 Llama 3 架构下使用 MHA、序列长度为 8192 时的 KV-Cache 内存 s K V s_{KV}：
+_多头注意力（Multi-head attention，MHA）_ 是最初的 Transformer 论文（[Vaswani et al., 2023](https://arxiv.org/abs/1706.03762)）中提出的标准注意力机制。其核心思想是：你有 N 个注意力头，每个头独立执行相同的检索任务——将隐藏状态转换为查询（queries）、键（keys）和值（values），然后利用当前查询通过与键的匹配来检索最相关的 token，最后将匹配到的 token 对应的值向前传递。在推理阶段，我们无需重新计算过去 token 的 KV 值，而是可以复用它们。用于存储过去 KV 值的内存称为 _KV-Cache_。随着上下文窗口的增长，该缓存很快就会成为推理瓶颈，并占用大量 GPU 显存。下面是一个简单计算，用于估算在 Llama 3 架构下使用 MHA、序列长度为 8192 时的 KV-Cache 内存 $s_{KV}$：
 
-```markdown
-s K V=2×n b y t e s×s e q×n l a y e r s×n h e a d s×d i m h e a d s=2×2×8192×32×32×128=4 GB(Llama 3 8B)=2×2×8192×80×64×128=20 GB(Llama 3 70B)\begin{equation} \begin{aligned} s_{KV} &= 2 \times n_{bytes} \times seq \times n_{layers} \times n_{heads} \times dim_{heads} \\ &= 2 \times 2 \times8192 \times 32 \times 32 \times 128 =4 \text{ GB} \textit{ (Llama 3 8B)} \\ &= 2 \times 2 \times8192 \times 80 \times 64 \times 128 =20 \text{ GB} \textit{ (Llama 3 70B)} \end{aligned} \end{equation}
-```
+$$
+\begin{aligned}
+s_{KV} &= 2 \times n_{bytes} \times seq \times n_{layers} \times n_{heads} \times dim_{heads} \\
+&= 2 \times 2 \times 8192 \times 32 \times 32 \times 128 = 4 \text{ GB} \textit{ (Llama 3 8B)} \\
+&= 2 \times 2 \times 8192 \times 80 \times 64 \times 128 = 20 \text{ GB} \textit{ (Llama 3 70B)}
+\end{aligned}
+$$
 
 注意，最前面的系数 2 来自于同时存储 key（键）和 value（值）缓存。如你所见，缓存随序列长度线性增长，但上下文窗口却呈指数级扩展，如今已可达数百万个 token。因此，提升缓存效率将使在推理时扩展上下文变得更加容易。
 
-自然会问：我们真的需要为每个注意力头（head）都准备一组新的 KV 值吗？大概不需要。Multi-Query Attention（MQA，多查询注意力）（[Shazeer, 2019](https://arxiv.org/abs/1911.02150)）和 Grouped Query Attention（GQA，分组查询注意力）（[Ainslie et al., 2023](https://arxiv.org/abs/2305.13245)）都解决了这一问题。最简单的情况是在所有头之间共享 KV 值，从而将 KV 缓存大小除以 n_{heads}，例如对 Llama 3 70B 而言可减少 64 倍！这就是 MQA 的思想，并已在诸如 StarCoder 等模型中用作 MHA（Multi-Head Attention，多头注意力）的替代方案。然而，我们可能会因此牺牲过多的注意力容量，于是可以考虑折中方案：在若干头组成的组内共享同一组 KV 值，例如 4 个头共享一组 KV。这就是 GQA 方法，在 MQA 与 MHA 之间取得了平衡。
+自然会问：我们真的需要为每个注意力头（head）都准备一组新的 KV 值吗？大概不需要。Multi-Query Attention（MQA，多查询注意力）（[Shazeer, 2019](https://arxiv.org/abs/1911.02150)）和 Grouped Query Attention（GQA，分组查询注意力）（[Ainslie et al., 2023](https://arxiv.org/abs/2305.13245)）都解决了这一问题。最简单的情况是在所有头之间共享 KV 值，从而将 KV 缓存大小除以 $n_{heads}$，例如对 Llama 3 70B 而言可减少 64 倍！这就是 MQA 的思想，并已在诸如 StarCoder 等模型中用作 MHA（Multi-Head Attention，多头注意力）的替代方案。然而，我们可能会因此牺牲过多的注意力容量，于是可以考虑折中方案：在若干头组成的组内共享同一组 KV 值，例如 4 个头共享一组 KV。这就是 GQA 方法，在 MQA 与 MHA 之间取得了平衡。
 
-最近，DeepSeek-v2（也在 v3 中使用）引入了 Multi-Latent Attention (MLA，多潜在注意力)（[DeepSeek-AI et al., 2024](https://arxiv.org/abs/2405.04434)），它采用了一种不同的策略来压缩缓存：不是减少 KV 值的数量，而是减小它们的大小，仅存储一个潜在变量，该变量可在运行时解压为 KV 值。借助这种方法，他们成功地将缓存降低到相当于 GQA 2.25 组的规模，同时性能还优于 MHA！为了与 RoPE 兼容，需要用一个额外的小潜在向量进行微调。在 DeepSeek-v2 中，主潜在变量维度选为 4∗dim_{head}，RoPE 部分为 1/2∗dim_{head}，因此总共是 4.5∗dim_{head}，同时用于 K 和 V，从而去掉了前面的系数 2。
+最近，DeepSeek-v2（也在 v3 中使用）引入了 Multi-Latent Attention (MLA，多潜在注意力)（[DeepSeek-AI et al., 2024](https://arxiv.org/abs/2405.04434)），它采用了一种不同的策略来压缩缓存：不是减少 KV 值的数量，而是减小它们的大小，仅存储一个潜在变量，该变量可在运行时解压为 KV 值。借助这种方法，他们成功地将缓存降低到相当于 GQA 2.25 组的规模，同时性能还优于 MHA！为了与 RoPE 兼容，需要用一个额外的小潜在向量进行微调。在 DeepSeek-v2 中，主潜在变量维度选为 $4\times dim_{head}$，RoPE 部分为 $1/2\times dim_{head}$，因此总共是 $4.5\times dim_{head}$，同时用于 K 和 V，从而去掉了前面的系数 2。
 
 你可以在下面的图示中直观地了解每种注意力机制：
 
@@ -521,16 +525,16 @@ s K V=2×n b y t e s×s e q×n l a y e r s×n h e a d s×d i m h e a d s=2×2×8
 
 | Attention Mechanism（注意力机制） | KV-Cache parameters per token（每个 token 的 KV 缓存参数量） |
 | --- | --- |
-| MHA | =2×n_{heads}×n_{layers}×dim_{head} |
-| MQA | =2×1×n_{layers}×dim_{head} |
-| GQA | =2×g×n_{layers}×dim_{head}（通常 g=2,4,8） |
-| MLA | =4.5×n_{layers}×dim_{head} |
+| MHA | $=2×n_{heads}×n_{layers}×dim_{head}$ |
+| MQA | $=2×1×n_{layers}×dim_{head}$ |
+| GQA | $=2×g×n_{layers}×dim_{head}$（通常 $g=2,4,8$） |
+| MLA | $=4.5×n_{layers}×dim_{head}$ |
 
 现在让我们看看这些注意力机制在真实实验中的表现！
 
 Ablation - GQA beats MHA（消融实验 - GQA 优于 MHA）
 
-下面我们来比较不同的注意力机制。我们的[基线](https://huggingface.co/datasets/HuggingFaceTB/ablations-training-configs/blob/main/baseline_config_1B.yaml)模型使用 32 个 Query 头（查询头）和 8 个 KV 头（键值头），对应 GQA（Grouped Query Attention，分组查询注意力）的压缩比为 32/8=4。如果改用 MHA（Multi-Head Attention，多头注意力），或者进一步减少 KV 头数量、提高 GQA 压缩比，性能会如何变化？
+下面我们来比较不同的注意力机制。我们的[基线](https://huggingface.co/datasets/HuggingFaceTB/ablations-training-configs/blob/main/baseline_config_1B.yaml)模型使用 32 个 Query 头（查询头）和 8 个 KV 头（键值头），对应 GQA（Grouped Query Attention，分组查询注意力）的压缩比为 $32/8=4$。如果改用 MHA（Multi-Head Attention，多头注意力），或者进一步减少 KV 头数量、提高 GQA 压缩比，性能会如何变化？
 
 改变 KV 头数量会显著影响参数量，尤其在 MHA 场景下。为保持一致，我们对 MHA 实验减少了层数，否则其参数量将多出 1 亿以上；其余配置均保持默认的 16 层。
 
@@ -547,11 +551,11 @@ Ablation - GQA beats MHA（消融实验 - GQA 优于 MHA）
 
 因此，我们比较了 MHA、MQA 以及 4 种 GQA 配置（压缩比 2、4、8、16）。对应的 nanotron 配置文件可在此[获取](https://huggingface.co/datasets/HuggingFaceTB/training-guide-nanotron-configs/tree/main/attention)。
 
-从消融结果看，MQA 和仅保留 1~2 个 KV 头的 GQA（16 组）相比 MHA 显著落后；而 GQA 在 2、4、8 组配置下则与 MHA 性能大致相当。
+从消融结果看，MQA 和仅保留 $1 \sim 2$ 个 KV 头的 GQA（$16$ 组）相比 MHA 显著落后；而 GQA 在 $2$、$4$、$8$ 组配置下则与 MHA 性能大致相当。
 
 这一结论在损失曲线和下游评测中均保持一致。我们在 HellaSwag、MMLU、ARC 等基准上能清晰观察到该趋势，而 OpenBookQA 和 WinoGrande 的波动则稍大。
 
-基于这些消融实验（ablations），GQA（Grouped Query Attention，分组查询注意力）是 MHA（Multi-Head Attention，多头注意力）的一个可靠替代方案。它在保持性能的同时，在推理阶段更加高效。一些近期模型采用了 MLA（Multi-Head Latent Attention，多头潜在注意力）以实现更大的 KV 缓存压缩，不过它尚未被广泛采用。由于在进行消融实验时 nanotron 尚未实现 MLA，我们并未对其进行消融。对于 SmolLM3，我们使用了 4 个组的 GQA。
+基于这些消融实验（ablations），GQA（Grouped Query Attention，分组查询注意力）是 MHA（Multi-Head Attention，多头注意力）的一个可靠替代方案。它在保持性能的同时，在推理阶段更加高效。一些近期模型采用了 MLA（Multi-Head Latent Attention，多头潜在注意力）以实现更大的 KV 缓存压缩，不过它尚未被广泛采用。由于在进行消融实验时 nanotron 尚未实现 MLA，我们并未对其进行消融。对于 SmolLM3，我们使用了 $4$ 个组的 GQA。
 
 除了注意力架构本身，训练期间使用的注意力模式也很重要。让我们来看看注意力掩码（attention masking）。
 
@@ -559,7 +563,7 @@ Ablation - GQA beats MHA（消融实验 - GQA 优于 MHA）
 
 我们在训练序列中如何应用注意力，既影响计算效率，也影响模型性能。这就引出了*文档掩码（document masking）*以及更广泛的、如何在数据加载器（dataloader）中构造训练样本的问题。
 
-在预训练阶段，我们使用固定序列长度进行训练，但文档长度各异。一篇研究论文可能有 10k 个词元（tokens），而一段简短的代码片段只有几百个词元。我们如何将可变长度的文档装入固定长度的训练序列？将较短文档填充（padding）到目标长度会浪费算力在无意义的填充词元上。相反，我们使用打包（packing）：打乱并将文档用序列结束（EOS）词元拼接，然后将结果切分成与序列长度匹配的固定长度块。
+在预训练阶段，我们使用固定序列长度进行训练，但文档长度各异。一篇研究论文可能有 $10k$ 个词元（tokens），而一段简短的代码片段只有几百个词元。我们如何将可变长度的文档装入固定长度的训练序列？将较短文档填充（padding）到目标长度会浪费算力在无意义的填充词元上。相反，我们使用打包（packing）：打乱并将文档用序列结束（EOS）词元拼接，然后将结果切分成与序列长度匹配的固定长度块。
 
 实际过程如下：
 
@@ -575,7 +579,7 @@ Sequence 1: [File 1] + [File 2] + [File 3] + [partial File 4]
 Sequence 2: [rest of File 4] + [File 5] + [File 6] + ...
 ```
 
-如果某个文件足够长，能够填满我们的 4k 上下文，那么一个训练序列可能只包含一个完整文件；但在大多数情况下文件较短，因此序列会包含多个随机文件的拼接。
+如果某个文件足够长，能够填满我们的 $4k$ 上下文，那么一个训练序列可能只包含一个完整文件；但在大多数情况下文件较短，因此序列会包含多个随机文件的拼接。
 
 在标准的因果掩码（causal masking）机制下，token（词元）可以访问打包序列中所有之前的 token。在上面的示例中，文件 4 里那段 Python 函数的某个 token 就能“看到”燕麦棒食谱、气候变化文章，以及任何其他被一起打包的内容。我们先快速瞥一眼典型的 4k 预训练上下文里都会有什么。一项[分析](https://www.harmdevries.com/post/context-length/)显示，CommonCrawl 和 GitHub 中大约 80–90% 的文件都短于 2k token。
 
@@ -616,7 +620,7 @@ model_config:
 
 如果你查看我们基线消融（ablation）模型的 [config](https://huggingface.co/datasets/HuggingFaceTB/training-guide-nanotron-configs/blob/main/baseline_config_1B.yaml)，会发现与标准 transformer 的一个不同之处在于，通过 `tie_word_embeddings` 标志启用了嵌入共享。
 
-LLM 有两个嵌入组件：输入嵌入（input embeddings）充当 token 到向量的查找表（大小为 vocab_size × hidden_dim），以及输出嵌入（output embeddings），即最后一个线性层，将隐藏状态映射到词汇表 logits（hidden_dim × vocab_size）。在经典情况下，这两者是独立的矩阵，因此嵌入参数总量为 2 × vocab_size × hidden_dim。于是，在小型语言模型中，嵌入可能占总参数量的很大比例，尤其在词汇表较大时。这使得嵌入共享（在输出层复用输入嵌入）成为小模型的自然优化手段。
+LLM 有两个嵌入组件：输入嵌入（input embeddings）充当 token 到向量的查找表（大小为 $vocab\_size \times hidden\_dim$），以及输出嵌入（output embeddings），即最后一个线性层，将隐藏状态映射到词汇表 logits（$hidden\_dim \times vocab\_size$）。在经典情况下，这两者是独立的矩阵，因此嵌入参数总量为 $2 \times vocab\_size \times hidden\_dim$。于是，在小型语言模型中，嵌入可能占总参数量的很大比例，尤其在词汇表较大时。这使得嵌入共享（在输出层复用输入嵌入）成为小模型的自然优化手段。
 
 更大的模型通常不使用该技术，因为嵌入在其参数预算中占比更小。例如，在不共享的情况下，总嵌入参数仅占 Llama3.2 8B 的 13%，以及 Llama3.1 70B 的 3%，如下饼图所示。
 
@@ -709,31 +713,31 @@ attn_weights = torch.softmax(scores, dim=-1)
 
 这段代码看起来可能比较复杂，所以我们用一个具体例子来拆解。考虑句子 _“The quick brown fox”_ 中的单词 _“fox”_。在我们的基线 1B 模型中，每个注意力头（attention head）处理的是 64 维的 query/key 向量。RoPE（Rotary Position Embedding，旋转位置编码）会把该向量拆成 32 对：(x₁, x₂)、(x₃, x₄)、(x₅, x₆)……之所以按“对”处理，是因为我们在二维空间里做旋转。为简单起见，只看第一对 (x₁, x₂)。单词 “fox” 在句中处于第 3 个位置，因此 RoPE 会把这对维度旋转：
 
-```
-rotation_angle = position × θ₀ 
-                = 3 × (1/10000^(0/32))
-                = 3 × 1.0 
-                = 3.0 弧度 
-                = 172°
-```
+$$
+\text{rotation\_angle} = \text{position} \times \theta₀ 
+                        = 3 \times \left(\frac{1}{10000^{0/32}}\right)
+                        = 3 \times 1.0 
+                        = 3.0 \text{ 弧度} 
+                        = 172°
+$$
 
 基频（base frequency）是 10000，但对第一维对（k=0）而言指数为零，因此基频不影响计算（任何数的 0 次方都是 1）。下图可视化这一过程：
 
 当两个 token 通过注意力交互时，“魔法”就出现了。它们旋转后表示的点积，直接通过旋转角的相位差编码了相对距离（其中 `m` 和 `n` 为 token 位置）：
 
-```
-dot_product(RoPE(x, m), RoPE(y, n)) = Σₖ [xₖ * yₖ * cos((m-n) * θₖ)]
-```
+$$
+\text{dot\_product}(\text{RoPE}(x, m), \text{RoPE}(y, n)) = \sumₖ [xₖ \cdot yₖ \cdot \cos((m-n) \cdot \thetaₖ)]
+$$
 
-注意力模式仅取决于 (m-n)，因此相隔 5 个位置的 token 无论处于序列的哪个绝对位置，其角度关系都相同。于是，模型学到的是基于距离的模式，可在序列的任何绝对位置生效，并能外推到更长的序列。
+注意力模式仅取决于 $(m-n)$，因此相隔 5 个位置的 token 无论处于序列的哪个绝对位置，其角度关系都相同。于是，模型学到的是基于距离的模式，可在序列的任何绝对位置生效，并能外推到更长的序列。
 
 如何设置 RoPE 频率？
 
 在实践中，大多数 LLM（大语言模型）预训练都从较短的上下文长度（2K–4K tokens）开始，使用几万量级的 RoPE（旋转位置编码）基础频率，如 10K 或 50K。一开始就使用非常长的序列进行训练会因注意力（attention）随序列长度呈二次方扩展而变得计算昂贵，并且长上下文数据（>4K 上下文长度的样本）也有限，这一点我们在 [Attention](https://huggingfacetb-smol-training-playbook.hf.space/#attention) 的文档掩码部分已经见过。研究还表明，这可能会损害短上下文性能（[Zhu et al., 2025](https://arxiv.org/abs/2503.15450)）。模型通常先学习单词之间的短程相关性，因此长序列帮助不大。典型的做法是先使用较短序列完成大部分预训练，然后进行持续预训练（continual pretraining），或在最后几千亿 tokens 上改用更长序列。然而，随着序列长度增加，与 token 位置成比例的旋转角度会变大，可能导致远距离 token 的注意力分数过快衰减（[Rozière et al., 2024](https://arxiv.org/abs/2308.12950)；[Xiong et al., 2023](https://arxiv.org/abs/2309.16039)）：
 
-```
-θ = position x 1 / (base^(k/(dim/2)))
-```
+$$
+\theta = \text{position} \times \frac{1}{\text{base}^{(k/(\text{dim}/2))}}
+$$
 
 解决方法是，在增加序列长度的同时提高基础频率，以防止这种衰减，可采用 ABF（Adjusted Base Frequency）和 YaRN（Yet another RoPE extensioN）等方法。
 
@@ -766,13 +770,13 @@ RNoPE 混合方案： 鉴于上述权衡，[B. Yang et al. (2025)](https://arxiv
 部分/分块 RoPE（Partial/Fractional RoPE）：  
 另一种互补思路是只对模型维度的一个子集应用 RoPE。与 RNoPE（Remove NoPE） 在整层之间交替使用 RoPE 和 NoPE 不同，Partial RoPE 在同一层内混合二者。近期模型如 GLM-4.5（[5 Team et al., 2025](https://arxiv.org/abs/2508.06471)）或 Minimax-01（[MiniMax et al., 2025](https://arxiv.org/abs/2501.08313)）采用了这一策略，但早在 gpt-j（[Wang & Komatsuzaki, 2021](https://github.com/kingoflolz/mesh-transformer-jax)）等旧模型中就已出现。此外，所有使用 MLA（Multi-head Latent Attention，多头隐式注意力） 的模型都必须采用 Partial RoPE，否则推理成本将高得难以接受。
 
-MLA 通过投影吸收（projection absorption）实现高效推理：不再为每个头存储独立的键 k_i^(h)，而是缓存一个小的共享隐向量 c_i = x_i W_c ∈ ℝ^{d_c}，并将头的查询/键映射合并，使得每次打分都很廉价。令 q_t^(h) = x_t W_q^(h) 与 k_i^(h) = c_i E^(h)，定义 U^(h) = W_q^(h) E^(h)，可得：
+MLA 通过投影吸收（projection absorption）实现高效推理：不再为每个头存储独立的键 $k_i^{(h)}$，而是缓存一个小的共享隐向量 $c_i = x_i W_c \in \mathbb{R}^{d_c}$，并将头的查询/键映射合并，使得每次打分都很廉价。令 $q_t^{(h)} = x_t W_q^{(h)}$ 与 $k_i^{(h)} = c_i E^{(h)}$，定义 $U^{(h)} = W_q^{(h)} E^{(h)}$，可得：
 
 $$
 s_{t,i}^{(h)} = \frac{1}{\sqrt{d_k}} \big(q_t^{(h)}\big)^\top k_i^{(h)} = \frac{1}{\sqrt{d_k}} \big(x_t U^{(h)}\big)^\top c_i
 $$
 
-于是只需用 $q̃_t^{(h)} = x_t U^(h) ∈ ℝ^{d_c}$ 与微小的缓存 $c_i$ 计算（无需存储每个头的 k）。RoPE 会破坏这一过程，因为它在两个映射之间插入了依赖位置的旋转：若使用全维度 RoPE，则……
+于是只需用 $\tilde{q}_t^{(h)} = x_t U^{(h)} \in \mathbb{R}^{d_c}$ 与微小的缓存 $c_i$ 计算（无需存储每个头的 $k$）。RoPE 会破坏这一过程，因为它在两个映射之间插入了依赖位置的旋转：若使用全维度 RoPE，则……
 
 $$
 s_{t,i}^{(h)} = \frac{1}{\sqrt{d_k}}\bigl(x_t W_q^{(h)}\bigr)^\top
@@ -791,9 +795,9 @@ $$
 
 分块注意力（Chunked Attention） 将序列划分为固定大小的块（chunk），每个 token 只能关注自己所在块内的其他 token。在我们的示例中，16 个 token 被拆成两个 8 token 的块（0–7 和 8–15），每个 token 只能看到同一块内的其他 token。注意，token 8 到 15 完全无法回看前面的块。这样在块边界处形成隔离的注意力窗口并重置。Llama 4（[Meta AI, 2025](https://ai.meta.com/blog/llama-4-multimodal-intelligence/)）在 RoPE 层（四分之三的解码层）使用 8192 token 的分块注意力，而 NoPE 层则保持对完整上下文的访问。通过限制每层的 KV 缓存大小，这降低了内存需求，但也意味着 token 无法关注之前的块，可能会影响某些长上下文任务。
 
-滑动窗口注意力（Sliding Window Attention, SWA），由 Mistral 7B（[Child et al., 2019](https://huggingfacetb-smol-training-playbook.hf.space/#bib-child2019generating)；[Jiang et al., 2023](https://arxiv.org/abs/2310.06825)）推广，采用不同的思路：基于“最近的 token 最相关”的直觉。它没有硬性的块边界，而是让每个 token 只关注最近的 N 个 token。在图中，每个 token 最多能看到往前 8 个位置，形成在序列上连续滑动的窗口。注意，token 15 可以关注位置 8–15，而 token 10 可以关注位置 3–10。窗口不断前移，在整个序列上保持局部上下文，而没有分块带来的人为屏障。Gemma 3 将 SWA 与全注意力交替使用，类似于混合位置编码策略将不同方法结合的做法。
+滑动窗口注意力（Sliding Window Attention, SWA），由 Mistral 7B（[Child et al., 2019](https://huggingfacetb-smol-training-playbook.hf.space/#bib-child2019generating)；[Jiang et al., 2023](https://arxiv.org/abs/2310.06825)）推广，采用不同的思路：基于“最近的 token 最相关”的直觉。它没有硬性的块边界，而是让每个 token 只关注最近的 $N$ 个 token。在图中，每个 token 最多能看到往前 8 个位置，形成在序列上连续滑动的窗口。注意，token 15 可以关注位置 8–15，而 token 10 可以关注位置 3–10。窗口不断前移，在整个序列上保持局部上下文，而没有分块带来的人为屏障。Gemma 3 将 SWA 与全注意力交替使用，类似于混合位置编码策略将不同方法结合的做法。
 
-双块注意力（Dual Chunk Attention, DCA）（[An et al., 2024](https://arxiv.org/abs/2402.17463)）是一种无需训练的方法，它在保留跨块信息流动的同时扩展了分块注意力（chunked attention）。在我们的示例中，使用块大小 s=4，将 16 个 token 分成 4 块（沿对角线可视化为 4×4 的方块）。DCA 结合了三种机制：(1) 块内注意力（Intra-chunk attention）：token 在其所属块内正常进行注意力计算（对角线模式）。(2) 块间注意力（Inter-chunk attention）：查询使用位置索引 c−1=7 关注前面的块，生成被限制在 7 以内的相对位置。(3) 连续块注意力（Successive chunk attention）：使用局部窗口 w=3，保留相邻块之间的局部性。这样所有相对位置都保持在训练分布范围内（0 到 7），同时在块边界处实现平滑过渡。DCA 使 Qwen2.5 等模型在推理时无需对百万级 token 序列进行持续训练，即可支持最长 100 万 token 的上下文窗口。
+双块注意力（Dual Chunk Attention, DCA）（[An et al., 2024](https://arxiv.org/abs/2402.17463)）是一种无需训练的方法，它在保留跨块信息流动的同时扩展了分块注意力（chunked attention）。在我们的示例中，使用块大小 $s=4$，将 16 个 token 分成 4 块（沿对角线可视化为 $4×4$ 的方块）。DCA 结合了三种机制：(1) 块内注意力（Intra-chunk attention）：token 在其所属块内正常进行注意力计算（对角线模式）。(2) 块间注意力（Inter-chunk attention）：查询使用位置索引 $c−1=7$ 关注前面的块，生成被限制在 7 以内的相对位置。(3) 连续块注意力（Successive chunk attention）：使用局部窗口 $w=3$，保留相邻块之间的局部性。这样所有相对位置都保持在训练分布范围内（0 到 7），同时在块边界处实现平滑过渡。DCA 使 Qwen2.5 等模型在推理时无需对百万级 token 序列进行持续训练，即可支持最长 100 万 token 的上下文窗口。
 
 在长上下文 Transformer 模型中会出现一个有趣现象：模型会给序列开头的 token 分配异常高的注意力分数，即使这些 token 在语义上并不重要。这种行为被称为注意力汇聚（attention sinks）（[Xiao et al.](https://arxiv.org/abs/2309.17453)）。这些初始 token 充当注意力分布的“汇聚点”，起到稳定注意力分布的作用。
 
@@ -879,8 +883,6 @@ Sparsity / activation ratio（稀疏度 / 激活比例）
 在本节中，我们想找出哪种 MoE（Mixture of Experts，混合专家）配置最佳。从渐近角度看，很容易发现两个极端都不是理想设置。一方面，始终激活所有专家会让我们回到稠密（dense）模式，即所有参数始终被使用。另一方面，如果活跃参数非常少（极端情况下只激活 1 个参数），显然即使在狭窄领域也不足以解决任务。因此，我们显然需要找到某种中间地带。
 
 在深入寻找最优配置之前，先定义两个量会很有用：激活比例（activation ratio） 及其倒数 稀疏度（sparsity）：
-
-<!-- activation ratio=#activated experts#total experts\text{activation ratio} \;=\; \frac{\#\text{activated experts}}{\#\text{total experts}}sparsity=#total experts#activated experts=1 activation ratio\text{sparsity} \;=\; \frac{\#\text{total experts}}{\#\text{activated experts}} \;=\; \frac{1}{\text{activation ratio}} -->
 
 $$
 \begin{aligned}
@@ -1391,6 +1393,8 @@ SmolLM 系列致力于突破小模型的能力边界。SmolLM2 推出了 135M、
 
 模型布局优化（Model layout optimization）： 我们比较了文献中近期 3B 模型的布局，有的优先深度，有的优先宽度。我们在自己的训练设置上测试了 Qwen2.5-3B（3.1B）、Llama3.2-3B（3.2B）和 Falcon3-H1-3B（3.1B）的布局，其中深度和宽度各不相同。结果很有趣：尽管 Qwen2.5-3B 的实际参数量更少，所有布局在损失和下游性能上几乎一致。但 Qwen2.5-3B 更深的架构与研究显示“网络深度有益于泛化”（[Petty et al., 2024](https://arxiv.org/abs/2310.19956)）相符。因此，我们选择了更深的布局，押注它在训练推进过程中会带来帮助。
 
+文档内注意力掩码（Intra-document attention masking）： 训练时我们阻止跨文档注意力，以在超长序列训练时提升训练速度与稳定性；再次发现这不会影响下游性能。
+
 稳定性改进：我们保留了 SmolLM2 的 tied embeddings（共享嵌入），但借鉴 OLMo2 的做法增加了一个新技巧——对 embeddings（嵌入）不再施加 weight decay（权重衰减）。我们的消融实验表明，这样做既不会损害性能，又能降低嵌入的范数，有助于防止训练发散。
 
 这种系统性消融实验的美妙之处在于，我们可以放心地将所有这些改动组合在一起，因为每一项都经过了验证。
@@ -1447,6 +1451,8 @@ SmolLM 系列致力于突破小模型的能力边界。SmolLM2 推出了 135M、
 AdamW
 
 Adam（Adaptive Momentum Estimation，自适应动量估计）是一种一阶（first order）优化技术。这意味着除了查看梯度本身，我们还会考虑权重在前几步中的变化量。这使得每个参数的学习率能够根据动量（momentum）自适应调整。
+
+细心的读者可能会问：嘿，你是不是漏掉了一个 W？确实如此！我们特意加上 W（=weight decay，权重衰减）的原因如下。在标准 SGD 中，我们只需在损失函数里加上 $ \lambda \theta^2 $（其中 $ \theta $ 为权重）即可应用 L2 正则化。然而，如果在 Adam 中同样这么做，自适应学习率也会影响到 L2 正则化。这意味着正则化强度会变得依赖于梯度大小，从而削弱其效果。这不是我们想要的，因此 AdamW 将其与主优化循环解耦（decoupled）以解决这一问题。
 
 细心的读者可能会问：嘿，你是不是漏掉了一个 W？确实如此！我们特意加上 W（=weight decay，权重衰减）的原因如下。在标准 SGD 中，我们只需在损失函数里加上 λ θ 2\lambda \theta^2（其中 θ\theta 为权重）即可应用 L2 正则化。然而，如果在 Adam 中同样这么做，自适应学习率也会影响到 L2 正则化。这意味着正则化强度会变得依赖于梯度大小，从而削弱其效果。这不是我们想要的，因此 AdamW 将其与主优化循环解耦（decoupled）以解决这一问题。
 
