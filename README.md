@@ -1,3 +1,102 @@
+# Smol 训练手册：打造世界级 LLM 的秘诀 (中文版)
+
+URL 来源：https://huggingfacetb-smol-training-playbook.hf.space/
+
+发布时间：2025 年 10 月 30 日
+
+
+[引言](https://huggingfacetb-smol-training-playbook.hf.space/#introduction)
+-----------------------------------------------------------------------------------
+
+如今，训练一个高性能的 LLM（Large Language Model，大语言模型）到底需要什么？
+
+已发表的研究让这一切看起来轻而易举：巧妙的架构选择、精心策划的数据集，以及充足的算力。结果光鲜亮丽，消融实验（ablations）结构清晰、干净利落。每个决定在事后看来都显而易见。但这些论文只展示了“奏效”的部分，并带有一点玫瑰色的后见之明——它们没有记录凌晨 2 点调试数据加载器（dataloader）的抓狂、损失飙升（loss spikes）的惊魂，或是那个悄悄毁掉你整个训练的微妙张量并行（tensor parallelism） bug（后文详述！）。现实更加混乱、更加迭代，充斥着大量最终论文里永远不会出现的决策。
+
+请与我们一起走进 [SmolLM3](https://huggingface.co/HuggingFaceTB/SmolLM3-3B) 的训练幕后——这是一个 30 亿参数的多语言推理模型，在 11 万亿 token 上完成训练。这不是一篇普通的博客，而是一张由决策、发现与死胡同交织成的蛛网，我们将其逐条拆解，最终沉淀出打造世界级语言模型的深层洞见。
+
+这也是我们模型训练长文系列的收官之作：我们已陆续探讨了如何大规模构建数据集（[FineWeb](https://huggingface.co/spaces/HuggingFaceFW/blogpost-fineweb-v1)）、如何协调数千块 GPU 齐声合唱（[Ultra Scale Playbook](https://huggingface.co/spaces/nanotron/ultrascale-playbook)），以及如何在每一步挑选最佳评测方案（[Evaluation Guidebook](https://github.com/huggingface/evaluation-guidebook)）。现在，我们将所有环节融会贯通，打造出一个强大的 AI 模型。我们将带你走完完整旅程——不仅分享最终奏效的配方，也揭露那些失败的尝试、基础设施崩溃的瞬间，以及左右每一次决策的调试过程。
+
+这段故事堪比一部戏剧：你会看到，小规模消融实验（ablation）的喜人结果为何在放大后失灵；我们为何在训练了 1T tokens 后重启；如何在多语言、数学与代码的 competing objectives（相互冲突的目标）之间取得平衡，同时保持强劲的英文表现；最终，我们又如何对一款混合推理模型进行 post-training（后训练）。
+
+我们也尽量避免罗列冷冰冰的“我们做了什么”，而是把这段冒险整理成一条有温度的叙事线。把它当成一本指南，献给所有想从“我们有了好数据集和 GPU”走向“我们炼出了真·强模型”的人。我们希望这份开放能缩小研究与生产之间的鸿沟，让你的下一次训练少几分混乱。
+
+### [如何阅读这篇博客文章](https://huggingfacetb-smol-training-playbook.hf.space/#how-to-read-this-blog-post)
+
+你无需从头到尾通读这篇博客文章，实际上它现在已经太长，不太可能一口气读完。整篇文章被拆成若干独立部分，可以按需跳过或单独阅读：
+
+*   **训练指南针（Training compass）：** 关于是否应该自己预训练模型的高层次讨论。我们会带你梳理在烧光所有风投的钱之前必须问自己的根本问题，并教你如何系统性地思考整个决策流程。这是一个偏战略的部分；如果你想直接看技术内容，可以快速滑过。
+*   **预训练（Pretraining）：** 紧随训练指南针之后的章节涵盖构建专属预训练配方所需的一切：如何运行消融实验（ablations）、选择评估指标、混合数据源、做架构选型、调超参数，并最终扛住训练马拉松。即使你并不打算从零开始预训练，而是想做继续预训练（continued pretraining，又称 mid-training），这部分同样适用。
+*   **后训练（Post-training）：** 在博客的这部分，你将学到把预训练模型潜力发挥到极致的全部技巧。从 SFT、DPO 到 GRPO 的后训练字母表，再到模型合并（model merging）的暗黑艺术与炼金术，一应俱全。让这些算法真正跑通的知识大多来自血泪教训，我们会在此分享经验，希望能帮你少踩几个坑。
+*   **基础设施（Infrastructure）：** 如果说预训练是蛋糕本体，后训练是糖霜和樱桃，那么基础设施就是工业级烤箱。没有它，什么都做不成；一旦它出问题，你愉快的周日烘焙就会变成火灾隐患。如何理解、分析并调试 GPU 集群的知识散落在各种库、文档和论坛中。本部分将带你梳理 GPU 布局、CPU/GPU/节点/存储之间的通信模式，以及如何识别并消除瓶颈。
+
+那么，我们从哪里开始呢？挑一个你最感兴趣的章节，出发吧！
+
+[训练指南针：为什么 → 做什么 → 怎么做](https://huggingfacetb-smol-training-playbook.hf.space/#training-compass-why--what--how)
+----------------------------------------------------------------------------------------------------------------------------
+
+机器学习（machine learning）领域对优化（optimisation）有着近乎痴迷的执着。我们紧盯损失曲线（loss curves）、模型架构（model architectures）和吞吐量（throughput）；毕竟，机器学习本质上就是在优化模型的损失函数（loss function）。然而，在深入这些技术细节之前，有一个更根本的问题却常被忽略：**我们真的应该训练这个模型吗？**
+
+如下热力图所示，开源 AI 生态系统几乎每天都在发布世界级模型：Qwen、Gemma、DeepSeek、Kimi、Llama 🪦、Olmo……这份名单每月都在变长。它们并非研究原型或玩具示例，而是覆盖多语言理解、代码生成、推理等惊人广度用例的生产级模型。大多数模型附带宽松许可证，并拥有活跃社区随时为你提供支持。
+
+这引出了一个令人不安的事实：**也许你根本不需要训练自己的模型。**
+
+在一篇“LLM 训练指南”里这样开头似乎有些奇怪。但许多失败的训练项目并非因为超参数（hyperparameters）糟糕或代码有 bug，而是因为有人决定训练一个并不需要的模型。因此，在你承诺训练、并深入探讨**如何**执行之前，必须先回答两个问题：**为什么**要训练这个模型？**训练什么**模型？若答案不清，你将浪费数月算力和工程时间，重复世界已有的成果，甚至更糟——造出无人需要的东西。
+
+让我们先从**为什么**开始，因为若不理解目的，后续任何决策都将失去连贯性。
+
+本节与博客其余部分不同：它较少涉及实验与技术细节，更多关乎战略规划。我们将引导你判断**是否需要从头训练（train from scratch）以及该构建怎样的模型**。如果你已经深入思考过“为什么”和“做什么”，可直接跳转到[Every big model starts with a small ablation](https://huggingfacetb-smol-training-playbook.hf.space/#every-big-model-starts-with-a-small-ablation)章节进行技术深挖。但若你仍存疑虑，在此投入时间将为你后续节省大量精力。
+
+### [**Why：没人愿意回答的问题**](https://huggingfacetb-smol-training-playbook.hf.space/#why-the-question-nobody-wants-to-answer)
+
+咱们直说现实里发生了什么。有人（如果走运）搞到了 GPU 集群，也许是靠研究经费，也许是公司闲置算力，然后思路大概是这样的：“我们有 100 张 H100，能用三个月。训个模型吧！”模型尺寸随手定，数据集有啥拼啥。训练开始。六个月后，算力预算烧光、团队士气耗尽，训出来的模型却没人用——因为从一开始就没问过 _为什么_。
+
+下面是你不该训模型的一些理由：
+
+“我们训了自己的模型”这句话确实诱人，但在投入大量时间和资源之前，先问一句：**你为什么要训这个模型？**
+
+下面的流程图展示了启动大规模预训练（pretraining）项目前应经历的思考过程。从技术角度看，你首先得确认有没有现成的模型可以直接提示（prompt）或微调（fine-tune）来完成任务。
+
+通常只有三种情况值得做自定义预训练：你想做前沿研究、你的生产场景需求极其特殊，或者你想填补开源模型生态的空白。咱们快速过一遍：
+
+#### [**研究：你想理解什么？**](https://huggingfacetb-smol-training-playbook.hf.space/#research-what-do-you-want-to-understand)
+
+在 LLM（大语言模型，Large Language Model）领域，可以开展的研究非常丰富。LLM 研究项目通常有一个共同点：你首先要提出一个清晰明确的问题：
+
+*   我们能否在这种新优化器（optimiser）上将训练扩展到 10B+ 参数？来自论文 [Muon is Scalable for LLM Training](https://huggingface.co/papers/2502.16982)
+*   仅通过强化学习（reinforcement learning），而不使用监督微调（SFT，Supervised Fine-Tuning），能否产生推理能力？来自论文 [DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning](https://huggingface.co/papers/2501.12948)
+*   我们能否仅使用合成教科书数据训练出优秀的小模型？来自论文 [Textbooks Are All You Need](https://huggingface.co/papers/2306.11644)
+*   仅使用公开许可的数据进行训练，能否达到具有竞争力的性能？来自论文 [The Common Pile v0.1: An 8TB Dataset of Public Domain and Openly Licensed Text](https://huggingface.co/papers/2506.05209)
+
+尽可能具体地提出假设，并思考所需的实验规模，可以显著提高成功的概率。
+
+#### [**生产阶段：为什么不能直接复用现有模型？**](https://huggingfacetb-smol-training-playbook.hf.space/#production-why-cant-you-use-an-existing-model)
+
+企业无法直接拿现成模型（off-the-shelf model）落地，通常有三类原因：两类是技术性的，另一类关乎治理。
+
+**第一，领域特异性（domain specificity）：** 当数据或任务包含高度专业化的词汇或结构，而现有模型难以胜任时。例如：
+
+*   DNA 模型需要独特的词表并捕捉长程依赖。  
+*   法律或金融模型必须深谙行业术语与逻辑。
+
+**第二，部署约束（deployment constraints）：** 需要针对自有硬件、延迟或隐私要求定制模型。例如，在无人机或本地部署系统上运行 LLM，且硬件为 FPGA 等定制芯片。
+
+一个简单的自检方法：花几天时间在 Qwen3、Gemma3 或其他当前 SOTA（state-of-the-art，最先进）模型上做提示工程、工具调用或后训练（post-training）。如果仍无法达到性能目标，就该考虑自训模型了。
+
+即使后训练所需预算巨大，通常仍比从零开始训练划算。用 1T token 做微调，比从 0 训到 10T+ token 更经济。
+
+**第三，安全与治理（safety and governance）：** 身处受监管行业或高 stakes（高风险）场景时，必须完全掌控训练数据、模型行为与更新周期。你需要**确切**知道模型里放了什么，并能向监管机构证明。某些情况下，自建模型是唯一选择。
+
+以上是企业自训内部模型的主要原因。那么，那些发布开源模型的公司或组织又是出于什么考虑呢？
+
+#### [**战略性开源：你发现了可以填补的空白吗？**](https://huggingfacetb-smol-training-playbook.hf.space/#strategic-open-source-do-you-see-a-gap-you-can-fill)
+
+经验丰富的 AI 实验室发布新开源模型最常见的原因之一，是他们识别到了开源生态系统中某个具体的空白或新的 AI 使用场景。
+
+典型流程如下：你注意到一个尚未被充分探索的领域——也许市面上缺乏具备超长上下文的强大小模型（on-device models），或者虽然有多语言模型（multilingual models），但在低资源语言（low-resource languages）上表现薄弱；又或者领域正朝着交互式世界模型（interactive world-models）如 [Genie3](https://deepmind.google/discover/blog/genie-3-a-new-frontier-for-world-models/) 发展，却没有优秀的开放权重（open-weight）模型可用。
+
+你有理由相信你能做得更好：也许你整理了更优质的训练数据，开发了更好的训练方案（training recipes），或者拥有别人无法企及的算力来做过度训练（overtrain）。你的目标非常具体：不是“史上最佳模型”，而是“最适合端侧使用的 3B 模型”或“首个支持 1M 上下文的小模型”。
+
+这是一个真实可行的目标，成功就能创造价值：开发者会采用你的模型，它会成为他人的基础设施，或为你建立技术信誉。但成功需要经验。你必须知道什么是真正可实现的，以及如何在一个竞争激烈的空间里可靠地执行。为了具体说明，我们来看看 Hugging Face 内部如何思考这个问题。
 
 #### [**Hugging Face 的旅程**](https://huggingfacetb-smol-training-playbook.hf.space/#hugging-faces-journey)
 
