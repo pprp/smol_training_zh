@@ -80,8 +80,6 @@ Bloom 的继任者是 2022 年的 StarCoder（[Li et al., 2023](https://arxiv.or
 
 以下是截至 2025 年、适用于不同架构和模型规模的强基线选项的非 exhaustive（非穷尽）列表：
 
-[TRANSLATION ERROR: ]
-
 | Architecture Type | Model Family | Sizes |
 | --- | --- | --- |
 | **Dense** | [Llama 3.1](https://huggingface.co/collections/meta-llama/llama-31-669fc079a0c406a149a5738f) | 8B, 70B |
@@ -251,7 +249,6 @@ tokens:
 ```
 from transformers import LlamaConfig, LlamaForCausalLM
 
-```python
 def count_parameters(
     tie_embeddings=True,
     num_key_value_heads=4,
@@ -382,20 +379,18 @@ def count_parameters(
 
 那么，如今的现代大语言模型（LLM）到底在用什么呢？让我们看看领先模型已趋同的选择。遗憾的是，并非所有模型都公开训练细节，但 DeepSeek、OLMo、Kimi 和 SmolLM 等家族提供了足够的透明度，使我们得以窥见当前格局：
 
-[TRANSLATION ERROR: ]
-
-| Model | Architecture | Parameters | Training Tokens | Attention | Context Length (final) | Position Encoding | Precision | Init (std) | Optimizer | Max LR | LR Schedule | Warmup Steps | Batch Size |
+| 模型 | 架构 | 参数量 | 训练 token 数 | 注意力机制 | 上下文长度（最终） | 位置编码 | 精度 | 初始化（标准差） | 优化器 | 最大学习率 | 学习率调度 | 预热步数 | 批量大小 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | DeepSeek LLM 7B | Dense | 7B | 2T | GQA | 4K | RoPE | BF16 | 0.006 | AdamW | 4.2×10⁻⁴ | Multi-Step | 2K | 9.4M |
 | DeepSeek LLM 67B | Dense | 67B | 2T | GQA | 4K | RoPE | BF16 | 0.006 | AdamW | 3.2×10⁻⁴ | Multi-Step | 2K | 18.9M |
-| DeepSeek V2 | MoE | 236B (21B active) | 8.1T | MLA | 128K | Partial RoPE | - | 0.006 | AdamW | 2.4×10⁻⁴ | Multi-Step | 2K | 9.4M→37.7M (warmup 225B) |
-| DeepSeek V3 | MoE | 671B (37B active) | 14.8T | MLA | 129K | Partial RoPE | FP8 | 0.006 | AdamW | 2.2×10⁻⁴ | Multi-Step + Cosine | 2K | 12.6M→62.9M (warmup 469B) |
-| MiniMax-01 | MoE + Hybrid | 456B (45.9 active) | 11.4T | Linear attention + GQA | 4M | Partial RoPE | - | Xavier init with deepnorm scaling | AdamW | 2×10⁻⁴ | Multi-Step | 500 | 16M→32M→64M→128M |
-| Kimi K2 | MoE | 1T (32B active) | 15.5T | MLA | 128K | Partial RoPE | BF16 | likely 0.006 | MuonClip | 2×10⁻⁴ | WSD | 500 | 67M |
+| DeepSeek V2 | MoE | 236B（21B 激活） | 8.1T | MLA | 128K | Partial RoPE | — | 0.006 | AdamW | 2.4×10⁻⁴ | Multi-Step | 2K | 9.4M→37.7M（预热 225B） |
+| DeepSeek V3 | MoE | 671B（37B 激活） | 14.8T | MLA | 129K | Partial RoPE | FP8 | 0.006 | AdamW | 2.2×10⁻⁴ | Multi-Step + Cosine | 2K | 12.6M→62.9M（预热 469B） |
+| MiniMax-01 | MoE + Hybrid | 456B（45.9B 激活） | 11.4T | Linear attention + GQA | 4M | Partial RoPE | — | Xavier init + deepnorm scaling | AdamW | 2×10⁻⁴ | Multi-Step | 500 | 16M→32M→64M→128M |
+| Kimi K2 | MoE | 1T（32B 激活） | 15.5T | MLA | 128K | Partial RoPE | BF16 | 约 0.006 | MuonClip | 2×10⁻⁴ | WSD | 500 | 67M |
 | OLMo 2 7B | Dense | 7B | 5T | MHA | 4K | RoPE | BF16 | 0.02 | AdamW | 3×10⁻⁴ | Cosine | 2K | 4.2M |
 | SmolLM3 | Dense | 3B | 11T | GQA | 128K | NoPE | BF16 | 0.02 | AdamW | 2×10⁻⁴ | WSD | 2K | 2.3M |
 
-If you don’t understand some of these terms yet, such as MLA or NoPE or WSD, don’t worry. We’ll explain each one in this section. For now, just notice the variety: different attention mechanisms (MHA, GQA, MLA), position encodings (RoPE, NoPE, partial RoPE), and learning rate schedules (Cosine, Multi-Step, WSD).
+如果你现在还不理解其中的一些术语，比如 MLA、NoPE 或 WSD，别担心。我们会在本节逐一解释。此刻只需留意它们的多样性：不同的注意力机制（MHA、GQA、MLA）、位置编码（RoPE、NoPE、Partial RoPE）以及学习率调度策略（Cosine、Multi-Step、WSD）。
 
 面对这一长串架构选择，我们难免会感到无从下手。和大多数类似情况一样，我们将循序渐进，逐步积累所需的全部知识。首先聚焦最简单的基线架构（dense model，稠密模型），并逐一深入探究每个架构细节。随后，我们将深入 MoE（Mixture of Experts，混合专家）和 Hybrid（混合）模型，并讨论何时选用它们才是明智之举。最后，我们将探索 tokenizer（分词器）——一个常被忽视却至关重要的组件。我们应该直接用现有的，还是训练自己的？又该如何评估分词器的好坏？
 
@@ -795,12 +790,10 @@ activation ratio=#activated experts#total experts\text{activation ratio} \;=\; \
 *   Kimi K2 图表（[K. Team et al., 2025](https://arxiv.org/abs/2507.20534)）：同时展示了这两种效应：更高的稀疏度提升性能，但随着稀疏度继续增大，收益逐渐减弱。
 *   蚂蚁集团图表（[Tian et al., 2025](https://arxiv.org/abs/2507.17702)）：与 K2 结论一致，并额外指出，更高稀疏度的 MoE 从增加算力中获益更多。
 
-[TRANSLATION ERROR: ]
-
 ![Image 4: Image](https://huggingfacetb-smol-training-playbook.hf.space/_astro/Capture_decran_2025-10-20_a_13_25_47_2921384e-bcac-8087-83e5-fa7a40c1f342.asYkEXKU_1s8wtB.webp)
 
 ![Image 5: Image](https://huggingfacetb-smol-training-playbook.hf.space/_astro/Capture_decran_2025-10-20_a_13_26_08_2921384e-bcac-80b5-ac36-fb73d6374208.D-BBIjb7_Zs7nQa.webp)
-
+<!-- 
 Here is a table with the sparsity of some MoE model:
 
 | Model | Total experts | Activated per token (incl. shared) | Sparsity |
@@ -821,9 +814,31 @@ Here is a table with the sparsity of some MoE model:
 | Kimi K2 | 384 routed + 1 shared = 385 | 8 routed + 1 shared = 9 | 42.8 |
 | Qwen3-Next-80B-A3B-Instruct | 512 routed + 1 shared = 513 | 10 total active + 1 shared = 11 | 46.6 |
 
-The recent trend is clear: MoE models are getting sparser. That said, the optimal sparsity still depends on hardware and end-to-end efficiency. For example, Step-3 targets peak efficiency and intentionally doesn’t max out sparsity to fit their specific hardware and bandwidth constraints, while gpt-oss-20b have a low sparsity due to on-device memory constraints (the passive expert still take some memory).
+The recent trend is clear: MoE models are getting sparser. That said, the optimal sparsity still depends on hardware and end-to-end efficiency. For example, Step-3 targets peak efficiency and intentionally doesn’t max out sparsity to fit their specific hardware and bandwidth constraints, while gpt-oss-20b have a low sparsity due to on-device memory constraints (the passive expert still take some memory). -->
 
-**Granularity**
+以下是部分 MoE 模型稀疏度对比表：
+
+| 模型 | 专家总数 | 每 token 激活专家数（含共享） | 稀疏度 |
+| --- | --- | --- | --- |
+| Mixtral-8×7B | 8 | 2 | 4.0 |
+| Grok-1 | 8 | 2 | 4.0 |
+| Grok-2 | 8 | 2 | 4.0 |
+| OLMoE-1B-7B-0924 | 64 | 8 | 8.0 |
+| gpt-oss 20b | 32 | 4 | 8 |
+| Step-3 | 48 路由 + 1 共享 = 49 | 3 路由 + 1 共享 = 4 | 12.25 |
+| GLM-4.5-Air | 128 路由 + 1 共享 = 129 | 8 路由 + 1 共享 = 9 | 14.3 |
+| Qwen3-30B-A3B | 128 | 8 | 16.0 |
+| Qwen3-235B-A22B | 128 | 8 | 16.0 |
+| GLM-4.5 | 160 路由 + 1 共享 = 161 | 8 路由 + 1 共享 = 9 | 17.8 |
+| DeepSeek-V2 | 160 路由 + 2 共享 = 162 | 6 路由 + 2 共享 = 8 | 20.25 |
+| DeepSeek-V3 | 256 路由 + 1 共享 = 257 | 8 路由 + 1 共享 = 9 | 28.6 |
+| gpt-oss 120b | 128 | 4 | 32 |
+| Kimi K2 | 384 路由 + 1 共享 = 385 | 8 路由 + 1 共享 = 9 | 42.8 |
+| Qwen3-Next-80B-A3B-Instruct | 512 路由 + 1 共享 = 513 | 10 活跃 + 1 共享 = 11 | 46.6 |
+
+趋势显而易见：MoE 模型正变得越来越稀疏。不过，最优稀疏度仍取决于硬件与端到端效率。例如，Step-3 追求峰值效率，故意没有将稀疏度拉到极限，以适配其特定硬件与带宽限制；而 gpt-oss-20b 因设备内存限制只能保持较低稀疏度（被动专家仍会占用部分内存）。
+
+**粒度**
 
 除了稀疏性（sparsity）之外，我们还需要决定每个专家（expert）应该有多大。这由“粒度”（granularity）这一指标来衡量，该指标由蚂蚁集团（Ant Group）提出。我们先明确这个术语的含义。不同论文中的术语略有差异，有些使用了稍有不同的公式。这里我们采用与所引用图表一致的定义：
 
@@ -971,8 +986,7 @@ S t=G t⊙S t−1+v t k t⊤\mathbf{S}_t \;=\; \mathbf{G}_t \odot \mathbf{S}_{t-
 
 几乎所有最新的线性注意力方法都包含这种门控组件，只是 G t\mathbf{G}_t 的实现方式各异。以下是 [该论文](https://huggingfacetb-smol-training-playbook.hf.space/arxiv.org/abs/2312.06635) 列出的不同门控变体及其对应架构：
 
-[TRANSLATION ERROR: ]
-
+<!-- 
 | Model | Parameterization | Learnable parameters |
 | --- | --- | --- |
 | Mamba ([A. Gu & Dao, 2024](https://arxiv.org/abs/2312.00752)) | G t=exp⁡(−(1⊤α t)⊙exp⁡(A)),α t=softplus(x t W α 1 W α 2)\mathbf{G}_t = \exp(-(\mathbf{1}^\top \boldsymbol{\alpha}_t) \odot \exp(\mathbf{A})), \quad \boldsymbol{\alpha}t = \text{softplus}(\mathbf{x}t \mathbf{W}{\alpha_1} \mathbf{W}{\alpha_2}) | A∈R d k×d v,W α 1∈R d×d 16,W α 2∈R d 16×d v\mathbf{A} \in \mathbb{R}^{d_k \times d_v}, \quad \mathbf{W}{\alpha_1} \in \mathbb{R}^{d \times \frac{d}{16}}, \quad \mathbf{W}{\alpha_2} \in \mathbb{R}^{\frac{d}{16} \times d_v} |
@@ -983,7 +997,20 @@ S t=G t⊙S t−1+v t k t⊤\mathbf{S}_t \;=\; \mathbf{G}_t \odot \mathbf{S}_{t-
 | GateLoop ([Katsch, 2024](https://arxiv.org/abs/2311.01927)) | G t=α t⊤1,α t=σ(x t W α 1)exp⁡(x t W α 2 i)\mathbf{G}_t = \boldsymbol{\alpha}_t^\top \mathbf{1}, \quad \boldsymbol{\alpha}_t = \sigma(\mathbf{x}t \mathbf{W}{\alpha_1})\exp(\mathbf{x}t \mathbf{W}{\alpha_2} \mathrm{i}) | W α 1∈R d×d k,W α 2∈R d×d k\mathbf{W}{\alpha_1} \in \mathbb{R}^{d \times d_k}, \quad \mathbf{W}{\alpha_2} \in \mathbb{R}^{d \times d_k} |
 | HGRN-2 ([Qin et al., 2024](https://arxiv.org/abs/2404.07904)) | G t=α t⊤1,α t=γ+(1−γ)σ(x t W α)\mathbf{G}_t = \boldsymbol{\alpha}_t^\top \mathbf{1}, \quad \boldsymbol{\alpha}_t = \gamma + (1-\gamma)\sigma(\mathbf{x}t \mathbf{W}{\alpha}) | W α∈R d×d k,γ∈(0,1)d k\mathbf{W}_{\alpha} \in \mathbb{R}^{d \times d_k}, \quad \gamma \in (0,1)^{d_k} |
 | RWKV-6 ([B. Peng et al., 2024](https://arxiv.org/abs/2404.05892)) | G t=α t⊤1,α t=exp⁡(−exp⁡(x t W α))\mathbf{G}_t = \boldsymbol{\alpha}_t^\top \mathbf{1}, \quad \boldsymbol{\alpha}_t = \exp(-\exp(\mathbf{x}t \mathbf{W}{\alpha})) | W α∈R d×d k\mathbf{W}_{\alpha} \in \mathbb{R}^{d \times d_k} |
-| Gated Linear Attention (GLA) | G t=α t⊤1,α t=σ(x t W α 1 W α 2)1 τ\mathbf{G}_t = \boldsymbol{\alpha}_t^\top \mathbf{1}, \quad \boldsymbol{\alpha}t = \sigma(\mathbf{x}t \mathbf{W}{\alpha_1} \mathbf{W}{\alpha_2})^{\frac{1}{\tau}} | W α 1∈R d×16,W α 2∈R 16×d k\mathbf{W}{\alpha_1} \in \mathbb{R}^{d \times 16}, \quad \mathbf{W}{\alpha_2} \in \mathbb{R}^{16 \times d_k} |
+| Gated Linear Attention (GLA) | G t=α t⊤1,α t=σ(x t W α 1 W α 2)1 τ\mathbf{G}_t = \boldsymbol{\alpha}_t^\top \mathbf{1}, \quad \boldsymbol{\alpha}t = \sigma(\mathbf{x}t \mathbf{W}{\alpha_1} \mathbf{W}{\alpha_2})^{\frac{1}{\tau}} | W α 1∈R d×16,W α 2∈R 16×d k\mathbf{W}{\alpha_1} \in \mathbb{R}^{d \times 16}, \quad \mathbf{W}{\alpha_2} \in \mathbb{R}^{16 \times d_k} | -->
+
+
+| Model | Parameterization | Learnable parameters |
+| --- | --- | --- |
+| Mamba ([A. Gu & Dao, 2024](https://arxiv.org/abs/2312.00752)) | $\mathbf{G}_t = \exp(-(\mathbf{1}^\top \boldsymbol{\alpha}_t) \odot \exp(\mathbf{A})), \quad \boldsymbol{\alpha}_t = \text{softplus}(\mathbf{x}_t \mathbf{W}_{\alpha_1} \mathbf{W}_{\alpha_2})$ | $\mathbf{A} \in \mathbb{R}^{d_k \times d_v}, \quad \mathbf{W}_{\alpha_1} \in \mathbb{R}^{d \times \frac{d}{16}}, \quad \mathbf{W}_{\alpha_2} \in \mathbb{R}^{\frac{d}{16} \times d_v}$ |
+| Mamba-2 ([Dao & Gu, 2024](https://arxiv.org/abs/2405.21060)) | $\mathbf{G}_t = \gamma_t \mathbf{1}^\top \mathbf{1}, \quad \gamma_t = \exp(-\text{softplus}(\mathbf{x}_t \mathbf{W}_{\gamma})\exp(a))$ | $\mathbf{W}_{\gamma} \in \mathbb{R}^{d \times 1}, \quad a \in \mathbb{R}$ |
+| mLSTM ([Beck et al., 2025](https://arxiv.org/abs/2503.14376); H. [Peng et al., 2021](https://arxiv.org/abs/2103.02143)) | $\mathbf{G}_t = \gamma_t \mathbf{1}^\top \mathbf{1}, \quad \gamma_t = \sigma(\mathbf{x}_t \mathbf{W}_{\gamma})$ | $\mathbf{W}_{\gamma} \in \mathbb{R}^{d \times 1}$ |
+| Gated Retention ([Sun et al., 2024](https://arxiv.org/abs/2405.05254)) | $\mathbf{G}_t = \gamma_t \mathbf{1}^\top \mathbf{1}, \quad \gamma_t = \sigma(\mathbf{x}_t \mathbf{W}_{\gamma})^{\frac{1}{\tau}}$ | $\mathbf{W}_{\gamma} \in \mathbb{R}^{d \times 1}$ |
+| DFW (Mao, 2022; Pramanik et al., 2023) ([Mao, 2022](https://arxiv.org/abs/2210.04243)) | $\mathbf{G}_t = \boldsymbol{\alpha}_t^\top \boldsymbol{\beta}_t, \quad \boldsymbol{\alpha}_t = \sigma(\mathbf{x}_t \mathbf{W}_{\alpha}), \quad \boldsymbol{\beta}_t = \sigma(\mathbf{x}_t \mathbf{W}_{\beta})$ | $\mathbf{W}_{\alpha} \in \mathbb{R}^{d \times d_k}, \quad \mathbf{W}_{\beta} \in \mathbb{R}^{d \times d_v}$ |
+| GateLoop ([Katsch, 2024](https://arxiv.org/abs/2311.01927)) | $\mathbf{G}_t = \boldsymbol{\alpha}_t^\top \mathbf{1}, \quad \boldsymbol{\alpha}_t = \sigma(\mathbf{x}_t \mathbf{W}_{\alpha_1})\exp(\mathbf{x}_t \mathbf{W}_{\alpha_2} \mathrm{i})$ | $\mathbf{W}_{\alpha_1} \in \mathbb{R}^{d \times d_k}, \quad \mathbf{W}_{\alpha_2} \in \mathbb{R}^{d \times d_k}$ |
+| HGRN-2 ([Qin et al., 2024](https://arxiv.org/abs/2404.07904)) | $\mathbf{G}_t = \boldsymbol{\alpha}_t^\top \mathbf{1}, \quad \boldsymbol{\alpha}_t = \gamma + (1-\gamma)\sigma(\mathbf{x}_t \mathbf{W}_{\alpha})$ | $\mathbf{W}_{\alpha} \in \mathbb{R}^{d \times d_k}, \quad \gamma \in (0,1)^{d_k}$ |
+| RWKV-6 ([B. Peng et al., 2024](https://arxiv.org/abs/2404.05892)) | $\mathbf{G}_t = \boldsymbol{\alpha}_t^\top \mathbf{1}, \quad \boldsymbol{\alpha}_t = \exp(-\exp(\mathbf{x}_t \mathbf{W}_{\alpha}))$ | $\mathbf{W}_{\alpha} \in \mathbb{R}^{d \times d_k}$ |
+| Gated Linear Attention (GLA) | $\mathbf{G}_t = \boldsymbol{\alpha}_t^\top \mathbf{1}, \quad \boldsymbol{\alpha}_t = \sigma(\mathbf{x}_t \mathbf{W}_{\alpha_1} \mathbf{W}_{\alpha_2})^{\frac{1}{\tau}}$ | $\mathbf{W}_{\alpha_1} \in \mathbb{R}^{d \times 16}, \quad \mathbf{W}_{\alpha_2} \in \mathbb{R}^{16 \times d_k}$ |
 
 近期模型的门控线性注意力（Gated linear attention）形式，其差异主要体现在 $\mathbf{G}_t$ 的参数化上。偏置项已省略。
 
@@ -2995,9 +3022,10 @@ _表格显示不同精度与 GPU 代际下的理论 TFLOPs（TeraFLOPs，万亿�
 
 **理解这些数字**：这些理论峰值 FLOPs 代表**在理想条件下**所能实现的_最大计算吞吐量_，即所有计算单元满载且数据随时就绪。实际性能则高度取决于你的工作负载能否持续“喂饱”计算单元，以及你的运算能否高效映射到可用硬件。
 
-[TRANSLATION ERROR: ]
+<!-- 
+For SmolLM3, we were going to train on NVIDIA H100 80GB HBM3 GPUs, so we first wanted to test the H100’s theoretical TFLOPs specifications against real world performance. For this, we used the [SemiAnalysis GEMM benchmark](https://www.ray.so/#theme=prisma&darkMode=false&code=IyBBTUQgVklQIGltYWdlCmFsaWFzIGRydW49InN1ZG8gZG9ja2VyIHJ1biAtLXByaXZpbGVnZWQgLS1uZXR3b3JrPWhvc3QgLS1kZXZpY2U9L2Rldi9rZmQgLS1kZXZpY2U9L2Rldi9kcmkgLS1ncm91cC1hZGQgdmlkZW8gLS1jYXAtYWRkPVNZU19QVFJBQ0UgLS1zZWN1cml0eS1vcHQgc2VjY29tcD11bmNvbmZpbmVkIC0taXBjPWhvc3QgLS1zaG0tc2l6ZT0xOTI2IC0tcm0gLWl0IgpkcnVuIHNlbWlhbmFseXNpc3dvcmsvYW1kLW1hdG11bDpsYXRlc3QKRElTQUJMRV9BREROX0hJUF9MVD0wIFBZVE9SQ0hfVFVOQUJMRV9PUF9FTkFCTEVEPTEgcHl0aG9uIG1hdG11bC5weQoKI0FNRCBweXBpIG5pZ2h0bHkKZHJ1biBhbWQtbGF0ZXN0LXB5cGktbmlnaHRseS1tYXRtdWwKUFlUT1JDSF9UVU5BQkxFX09QX0VOQUJMRUQ9MSBweXRob24gbWF0bXVsLnB5CgojIEFNRCBweXBpIHN0YWJsZSBQeVRvcmNoIDIuNS4xCmRydW4gc2VtaWFuYWx5c2lzd29yay9hbWQtbGF0ZXN0LXB5cGktc3RhYmxlLW1hdG11bApQWVRPUkNIX1RVTkFCTEVfT1BfRU5BQkxFRD0xIHB5dGhvbiBtYXRtdWwucHkKCiMgTnZpZGlhIHN0YWJsZSAyNC4wOQphbGlhcyBkcnVuPSJkb2NrZXIgcnVuIC0tcm0gLWl0IC0tZ3B1cyBhbGwgLS1pcGM9aG9zdCAtLW5ldD1ob3N0IC0tc2htLXNpemU9MTkyNiIKZHJ1biBzZW1pYW5hbHlzaXN3b3JrL252aWRpYS1tYXRtdWw6bGF0ZXN0CnB5dGhvbiBtYXRtdWwucHkKCg&language=shell): it [tests throughput on real-world matrix multiplication shapes from Meta’s Llama 70B training](https://newsletter.semianalysis.com/p/mi300x-vs-h100-vs-h200-benchmark-part-1-training#general-matrix-multiply-gemm-performance). -->
 
-For SmolLM3, we were going to train on NVIDIA H100 80GB HBM3 GPUs, so we first wanted to test the H100’s theoretical TFLOPs specifications against real world performance. For this, we used the [SemiAnalysis GEMM benchmark](https://www.ray.so/#theme=prisma&darkMode=false&code=IyBBTUQgVklQIGltYWdlCmFsaWFzIGRydW49InN1ZG8gZG9ja2VyIHJ1biAtLXByaXZpbGVnZWQgLS1uZXR3b3JrPWhvc3QgLS1kZXZpY2U9L2Rldi9rZmQgLS1kZXZpY2U9L2Rldi9kcmkgLS1ncm91cC1hZGQgdmlkZW8gLS1jYXAtYWRkPVNZU19QVFJBQ0UgLS1zZWN1cml0eS1vcHQgc2VjY29tcD11bmNvbmZpbmVkIC0taXBjPWhvc3QgLS1zaG0tc2l6ZT0xOTI2IC0tcm0gLWl0IgpkcnVuIHNlbWlhbmFseXNpc3dvcmsvYW1kLW1hdG11bDpsYXRlc3QKRElTQUJMRV9BREROX0hJUF9MVD0wIFBZVE9SQ0hfVFVOQUJMRV9PUF9FTkFCTEVEPTEgcHl0aG9uIG1hdG11bC5weQoKI0FNRCBweXBpIG5pZ2h0bHkKZHJ1biBhbWQtbGF0ZXN0LXB5cGktbmlnaHRseS1tYXRtdWwKUFlUT1JDSF9UVU5BQkxFX09QX0VOQUJMRUQ9MSBweXRob24gbWF0bXVsLnB5CgojIEFNRCBweXBpIHN0YWJsZSBQeVRvcmNoIDIuNS4xCmRydW4gc2VtaWFuYWx5c2lzd29yay9hbWQtbGF0ZXN0LXB5cGktc3RhYmxlLW1hdG11bApQWVRPUkNIX1RVTkFCTEVfT1BfRU5BQkxFRD0xIHB5dGhvbiBtYXRtdWwucHkKCiMgTnZpZGlhIHN0YWJsZSAyNC4wOQphbGlhcyBkcnVuPSJkb2NrZXIgcnVuIC0tcm0gLWl0IC0tZ3B1cyBhbGwgLS1pcGM9aG9zdCAtLW5ldD1ob3N0IC0tc2htLXNpemU9MTkyNiIKZHJ1biBzZW1pYW5hbHlzaXN3b3JrL252aWRpYS1tYXRtdWw6bGF0ZXN0CnB5dGhvbiBtYXRtdWwucHkKCg&language=shell): it [tests throughput on real-world matrix multiplication shapes from Meta’s Llama 70B training](https://newsletter.semianalysis.com/p/mi300x-vs-h100-vs-h200-benchmark-part-1-training#general-matrix-multiply-gemm-performance).
+对于 SmolLM3，我们打算在 NVIDIA H100 80 GB HBM3 GPU 上进行训练，因此首先想验证 H100 的理论 TFLOPs 指标与真实世界性能是否一致。为此，我们使用了 [SemiAnalysis 的 GEMM 基准测试](https://www.ray.so/#theme=prisma&darkMode=false&code=IyBBTUQgVklQIGltYWdlCmFsaWFzIGRydW49InN1ZG8gZG9ja2VyIHJ1biAtLXByaXZpbGVnZWQgLS1uZXR3b3JrPWhvc3QgLS1kZXZpY2U9L2Rldi9rZmQgLS1kZXZpY2U9L2Rldi9kcmkgLS1ncm91cC1hZGQgdmlkZW8gLS1jYXAtYWRkPVNZU19QVFJBQ0UgLS1zZWN1cml0eS1vcHQgc2VjY29tcD11bmNvbmZpbmVkIC0taXBjPWhvc3QgLS1zaG0tc2l6ZT0xOTI2IC0tcm0gLWl0IgpkcnVuIHNlbWlhbmFseXNpc3dvcmsvYW1kLW1hdG11bDpsYXRlc3QKRElTQUJMRV9BREROX0hJUF9MVD0wIFBZVE9SQ0hfVFVOQUJMRV9PUF9FTkFCTEVEPTEgcHl0aG9uIG1hdG11bC5weQoKI0FNRCBweXBpIG5pZ2h0bHkKZHJ1biBhbWQtbGF0ZXN0LXB5cGktbmlnaHRseS1tYXRtdWwKUFlUT1JDSF9UVU5BQkxFX09QX0VOQUJMRUQ9MSBweXRob24gbWF0bXVsLnB5CgojIEFNRCBweXBpIHN0YWJsZSBQeVRvcmNoIDIuNS4xCmRydW4gc2VtaWFuYWx5c2lzd29yay9hbWQtbGF0ZXN0LXB5cGktc3RhYmxlLW1hdG11bApQWVRPUkNIX1RVTkFCTEVfT1BfRU5BQkxFRD0xIHB5dGhvbiBtYXRtdWwucHkKCiMgTnZpZGlhIHN0YWJsZSAyNC4wOQphbGlhcyBkcnVuPSJkb2NrZXIgcnVuIC0tcm0gLWl0IC0tZ3B1cyBhbGwgLS1pcGM9aG9zdCAtLW5ldD1ob3N0IC0tc2htLXNpemU9MTkyNiIKZHJ1biBzZW1pYW5hbHlzaXN3b3JrL252aWRpYS1tYXRtdWw6bGF0ZXN0CnB5dGhvbiBtYXRtdWwucHkKCg&language=shell)：该基准使用 Meta Llama 70B 训练中的真实矩阵乘法形状来测试吞吐。
 
 | 形状 (M, N, K) | FP64 torch.matmul | FP32 torch.matmul | FP16 torch.matmul | BF16 torch.matmul | FP8 TE.Linear（autocast，bias=False） | FP8 torch._scaled_mm（e5m2/e4m3fn） | FP8 torch._scaled_mm（e4m3） |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -3550,9 +3578,10 @@ NVSHMEM 在 GPU 通信方面具备多项关键优势：借助 GPUDirect Async �
 
 理解网络拓扑对诊断性能问题至关重要。云放置组（placement group）虽有帮助，但无法保证实例间网络跳数最少。在现代数据中心的 fat-tree（胖树）拓扑中，位于不同顶层交换机下的实例会因路由路径中的额外网络跳数而遭遇更高延迟，并可能降低带宽。
 
-[TRANSLATION ERROR: ]
 
-For **AWS EC2** users, the [Instance Topology API](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/how-ec2-instance-topology-works.html) provides valuable visibility into network node placement. Instances sharing t”he same network node at the bottom layer (directly connected to the instance) are physically closest and will achieve the lowest latency communication.
+<!-- For **AWS EC2** users, the [Instance Topology API](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/how-ec2-instance-topology-works.html) provides valuable visibility into network node placement. Instances sharing t”he same network node at the bottom layer (directly connected to the instance) are physically closest and will achieve the lowest latency communication. -->
+
+对于 **AWS EC2** 用户，[Instance Topology API](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/how-ec2-instance-topology-works.html) 提供了对网络节点放置的清晰视图。共享底层（与实例直接相连）同一网络节点的实例在物理上最接近，彼此通信的延迟也最低。
 
 ```
 graph TD
@@ -4265,7 +4294,6 @@ DP×TP×PP=384=2 7×3\text{DP} \times \text{TP} \times \text{PP} = 384 = 2^7 \ti
 
 [](https://huggingfacetb-smol-training-playbook.hf.space/#user-content-fnref-f3)
 
-[TRANSLATION ERROR: ]
 
 1.   Agarwal, R., Vieillard, N., Zhou, Y., Stanczyk, P., Ramos, S., Geist, M., & Bachem, O. (2024). _On-Policy Distillation of Language Models: Learning from Self-Generated Mistakes_. [https://arxiv.org/abs/2306.13649](https://arxiv.org/abs/2306.13649)[](https://huggingfacetb-smol-training-playbook.hf.space/#refctx-bib-gkd-1)
 2.   Ainslie, J., Lee-Thorp, J., de Jong, M., Zemlyanskiy, Y., Lebrón, F., & Sanghai, S. (2023). _GQA: Training Generalized Multi-Query Transformer Models from Multi-Head Checkpoints_. [https://arxiv.org/abs/2305.13245](https://arxiv.org/abs/2305.13245) back: [1](https://huggingfacetb-smol-training-playbook.hf.space/#refctx-bib-gqa-1), [2](https://huggingfacetb-smol-training-playbook.hf.space/#refctx-bib-gqa-2)
