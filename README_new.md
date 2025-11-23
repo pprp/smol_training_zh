@@ -1,4 +1,4 @@
-# Smol 训练手册：打造世界级 LLM 的秘诀 (中文版)
+# Smol 训练手册：打造世界级 LLM 的秘诀 (中文翻译版)
 
 URL 来源：https://huggingfacetb-smol-training-playbook.hf.space/
 
@@ -542,7 +542,7 @@ Ablation - GQA beats MHA（消融实验 - GQA 优于 MHA）
 | --- | --- | --- | --- | --- | --- |
 | MQA（Multi-Query Attention，多查询注意力） | 32 | 1 | 16 | 1.21B |  |
 | GQA（压缩比 16） | 32 | 2 | 16 | 1.21B |  |
-| GQA（压缩比 8） | 32 | 4 | 16 | 1.22B | 我们的基线 |
+| GQA（压缩比 8） | 32 | 4 | 16 | 1.22B | 基线 |
 | GQA（压缩比 4） | 32 | 8 | 16 | 1.24B |  |
 | GQA（压缩比 2） | 32 | 16 | 15 | 1.22B | 减少层数 |
 | MHA | 32 | 32 | 14 | 1.20B | 减少层数 |
