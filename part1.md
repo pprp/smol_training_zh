@@ -279,7 +279,6 @@ Bloom 的继任者是 2022 年的 StarCoder（[Li et al., 2023](https://arxiv.or
 ## 数据集与混合权重（Datasets and mixing weights）
 data_stages:
 - data:
-
     dataset:
       dataset_folder:
       - fineweb-edu
@@ -642,7 +641,7 @@ LLM 有两个嵌入组件：输入嵌入（input embeddings）充当 token 到�
 
 解决方案是位置嵌入（positional embeddings）：一种数学编码，为序列中的每个词元（token）赋予唯一的“地址”。然而，随着我们把上下文长度不断推升——从早期 BERT 的 512 个词元到如今百万词元级别——位置编码（positional encoding）的选择对性能与计算效率都变得愈发关键。
 
-位置编码的演进
+**位置编码的演进**
 
 早期 Transformer 使用简单的绝对位置嵌入（Absolute Position Embeddings, APE）（[Vaswani et al., 2023](https://arxiv.org/abs/1706.03762)），本质上是可学习的查找表，将每个位置（1、2、3…）映射为一个向量，再加到词元嵌入上。这在短序列上表现良好，但有一个重大局限：模型的最大输入序列长度受限于训练时的最大长度，无法直接泛化到更长的序列。
 
@@ -652,7 +651,7 @@ ALiBi（Attention with Linear Biases，线性偏置注意力）（[Press 等，2
 
 但近期大型语言模型中最主流的技术是旋转位置编码（Rotary Position Embedding，RoPE）（[苏 等，2023](https://arxiv.org/abs/2104.09864)）。
 
-RoPE：将位置视为旋转
+**RoPE：将位置视为旋转**
 
 RoPE 的核心洞见是将位置信息编码为高维空间中的旋转角度。它不是把位置向量加到 token 嵌入上，而是将 query 和 key 向量旋转一个与其绝对位置相关的角度。
 
@@ -749,7 +748,7 @@ YaRN（Yet another RoPE extensioN，又一种 RoPE 扩展）（[Peng et al., 202
 
 如今大多数主流模型都使用 RoPE：Llama、Qwen、Gemma 等。该技术已被证明在不同模型规模与架构（dense、MoE、Hybrid）下均表现稳健。让我们看看最近出现的几种 RoPE 变体。
 
-混合位置编码方法
+**混合位置编码方法**
 
 然而，随着模型向越来越大的上下文推进（[Meta AI, 2025](https://ai.meta.com/blog/llama-4-multimodal-intelligence/)；[Yang et al., 2025](https://arxiv.org/abs/2501.15383)），即便是 RoPE 也开始面临性能挑战。在比“针里寻针”（Needle in the Haystack，NIAH）更具挑战性的长上下文基准（如 Ruler 和 HELMET）（[Hsieh et al., 2024](https://arxiv.org/abs/2404.06654)；[Yen et al., 2025](https://arxiv.org/abs/2410.02694)）上评估时，单纯增加 RoPE 频率的标准长上下文扩展方法存在局限。为此，研究者引入了更新的技术。
 
@@ -767,7 +766,7 @@ RNoPE 混合方案： 鉴于上述权衡，[B. Yang et al. (2025)](https://arxiv
 
 损失与评估结果显示，三种配置的性能相近，表明 NoPE（No Position Embedding，无位置编码） 在保持强劲短上下文能力的同时，也为更好的长上下文处理奠定了基础。基于这些结果，我们在 SmolLM3 中采用了 NoPE + 文档掩码（document masking） 的组合。
 
-部分/分块 RoPE（Partial/Fractional RoPE）：  
+**部分/分块 RoPE（Partial/Fractional RoPE）**：  
 另一种互补思路是只对模型维度的一个子集应用 RoPE。与 RNoPE（Remove NoPE） 在整层之间交替使用 RoPE 和 NoPE 不同，Partial RoPE 在同一层内混合二者。近期模型如 GLM-4.5（[5 Team et al., 2025](https://arxiv.org/abs/2508.06471)）或 Minimax-01（[MiniMax et al., 2025](https://arxiv.org/abs/2501.08313)）采用了这一策略，但早在 gpt-j（[Wang & Komatsuzaki, 2021](https://github.com/kingoflolz/mesh-transformer-jax)）等旧模型中就已出现。此外，所有使用 MLA（Multi-head Latent Attention，多头隐式注意力） 的模型都必须采用 Partial RoPE，否则推理成本将高得难以接受。
 
 MLA 通过投影吸收（projection absorption）实现高效推理：不再为每个头存储独立的键 $k_i^{(h)}$，而是缓存一个小的共享隐向量 $c_i = x_i W_c \in \mathbb{R}^{d_c}$，并将头的查询/键映射合并，使得每次打分都很廉价。令 $q_t^{(h)} = x_t W_q^{(h)}$ 与 $k_i^{(h)} = c_i E^{(h)}$，定义 $U^{(h)} = W_q^{(h)} E^{(h)}$，可得：
@@ -787,7 +786,7 @@ $$
 解决方案：部分 RoPE（Partial RoPE）。  
 将头维度拆分为 $d_k = d_{\text{nope}} + d_{\text{rope}}$，在大块上不施加旋转（像以前一样吸收：$(x_t U_{\text{nope}}^{(h)})^\top c_i$），仅在小块上应用 RoPE。
 
-限制长上下文的注意力范围
+**限制长上下文的注意力范围**
 
 到目前为止，我们已经探讨了如何处理长上下文的位置信息：激活 RoPE、禁用它（NoPE）、仅在部分层上应用（RNoPE）或仅在某些隐藏维度上应用（Partial RoPE），或者调整其频率（ABF、YaRN）。这些方法通过修改模型如何编码位置，来处理比训练时更长的序列。但还有一种互补策略：与其调整位置编码，不如限制哪些 token 可以相互关注。
 
@@ -903,49 +902,28 @@ $$
 ![Image 4: Image](https://huggingfacetb-smol-training-playbook.hf.space/_astro/Capture_decran_2025-10-20_a_13_25_47_2921384e-bcac-8087-83e5-fa7a40c1f342.asYkEXKU_1s8wtB.webp)
 
 ![Image 5: Image](https://huggingfacetb-smol-training-playbook.hf.space/_astro/Capture_decran_2025-10-20_a_13_26_08_2921384e-bcac-80b5-ac36-fb73d6374208.D-BBIjb7_Zs7nQa.webp)
-<!-- 
-Here is a table with the sparsity of some MoE model:
 
-| Model | Total experts | Activated per token (incl. shared) | Sparsity |
-| --- | --- | --- | --- || Mixtral-8×7B | 8 | 2 | 4.0 |
-| Grok-1 | 8 | 2 | 4.0 |
-| Grok-2 | 8 | 2 | 4.0 |
-| OLMoE-1B-7B-0924 | 64 | 8 | 8.0 |
-| gpt-oss 20b | 32 | 4 | 8 |
-| Step-3 | 48 routed + 1 shared = 49 | 3 routed + 1 shared = 4 | 12.25 |
-| GLM-4.5-Air | 128 routed + 1 shared = 129 | 8 routed + 1 shared = 9 | 14.3 |
-| Qwen3-30B-A3B | 128 | 8 | 16.0 |
-| Qwen3-235B-A22B | 128 | 8 | 16.0 |
-| GLM-4.5 | 160 routed + 1 shared = 161 | 8 routed + 1 shared = 9 | 17.8 |
-| DeepSeek-V2 | 160 routed + 2 shared = 162 | 6 routed + 2 shared = 8 | 20.25 |
-| DeepSeek-V3 | 256 routed + 1 shared = 257 | 8 routed + 1 shared = 9 | 28.6 |
-| gpt-oss 120b | 128 | 4 | 32 |
-| Kimi K2 | 384 routed + 1 shared = 385 | 8 routed + 1 shared = 9 | 42.8 |
-| Qwen3-Next-80B-A3B-Instruct | 512 routed + 1 shared = 513 | 10 total active + 1 shared = 11 | 46.6 |
+以下是若干混合专家模型稀疏度的对比表格：
 
-The recent trend is clear: MoE models are getting sparser. That said, the optimal sparsity still depends on hardware and end-to-end efficiency. For example, Step-3 targets peak efficiency and intentionally doesn’t max out sparsity to fit their specific hardware and bandwidth constraints, while gpt-oss-20b have a low sparsity due to on-device memory constraints (the passive expert still take some memory). -->
-
-以下是部分 MoE 模型稀疏度对比表：
-
-| 模型 | 专家总数 | 每 token 激活专家数（含共享） | 稀疏度 |
+| 模型名称 | 专家总数 | 每令牌激活数（含共享） | 稀疏度 |
 | --- | --- | --- | --- |
 | Mixtral-8×7B | 8 | 2 | 4.0 |
 | Grok-1 | 8 | 2 | 4.0 |
 | Grok-2 | 8 | 2 | 4.0 |
 | OLMoE-1B-7B-0924 | 64 | 8 | 8.0 |
 | gpt-oss 20b | 32 | 4 | 8 |
-| Step-3 | 48 路由 + 1 共享 = 49 | 3 路由 + 1 共享 = 4 | 12.25 |
-| GLM-4.5-Air | 128 路由 + 1 共享 = 129 | 8 路由 + 1 共享 = 9 | 14.3 |
+| Step-3 | 48路由+1共享=49 | 3路由+1共享=4 | 12.25 |
+| GLM-4.5-Air | 128路由+1共享=129 | 8路由+1共享=9 | 14.3 |
 | Qwen3-30B-A3B | 128 | 8 | 16.0 |
 | Qwen3-235B-A22B | 128 | 8 | 16.0 |
-| GLM-4.5 | 160 路由 + 1 共享 = 161 | 8 路由 + 1 共享 = 9 | 17.8 |
-| DeepSeek-V2 | 160 路由 + 2 共享 = 162 | 6 路由 + 2 共享 = 8 | 20.25 |
-| DeepSeek-V3 | 256 路由 + 1 共享 = 257 | 8 路由 + 1 共享 = 9 | 28.6 |
+| GLM-4.5 | 160路由+1共享=161 | 8路由+1共享=9 | 17.8 |
+| DeepSeek-V2 | 160路由+2共享=162 | 6路由+2共享=8 | 20.25 |
+| DeepSeek-V3 | 256路由+1共享=257 | 8路由+1共享=9 | 28.6 |
 | gpt-oss 120b | 128 | 4 | 32 |
-| Kimi K2 | 384 路由 + 1 共享 = 385 | 8 路由 + 1 共享 = 9 | 42.8 |
-| Qwen3-Next-80B-A3B-Instruct | 512 路由 + 1 共享 = 513 | 10 活跃 + 1 共享 = 11 | 46.6 |
+| Kimi K2 | 384路由+1共享=385 | 8路由+1共享=9 | 42.8 |
+| Qwen3-Next-80B-A3B-Instruct | 512路由+1共享=513 | 10总激活+1共享=11 | 46.6 |
 
-趋势显而易见：MoE 模型正变得越来越稀疏。不过，最优稀疏度仍取决于硬件与端到端效率。例如，Step-3 追求峰值效率，故意没有将稀疏度拉到极限，以适配其特定硬件与带宽限制；而 gpt-oss-20b 因设备内存限制只能保持较低稀疏度（被动专家仍会占用部分内存）。
+当前趋势非常明显：混合专家模型正朝着更高稀疏度的方向发展。不过最优稀疏度仍取决于硬件条件与端到端效率。例如Step-3模型以峰值效率为目标，特意未追求极限稀疏度以适应其特定硬件与带宽限制；而gpt-oss-20b因受终端设备内存限制（未激活专家仍会占用部分内存），其稀疏度设置相对较低。
 
 粒度
 
@@ -1151,6 +1129,7 @@ $$\mathbf{S}_t \;=\; \mathbf{G}_t \odot \mathbf{S}_{t-1} \;+\; \mathbf{v}_t \mat
 我们已经了解了稠密（dense）、混合专家（MoE, Mixture of Experts）和混合（hybrid）模型，你可能自然想知道该用哪一种？架构选择通常取决于模型部署位置、团队经验以及时间线。我们快速回顾每种架构的优缺点，并给出一个简单的决策流程，帮你找到合适的架构。
 
 Dense transformers（稠密 Transformer）  
+
 标准的纯解码器 Transformer，每个 token 都会激活所有参数。数学推导见 [The Annotated Transformers](https://nlp.seas.harvard.edu/2018/04/03/attention.html)，直观理解可参考 [The Illustrated Transformers](https://jalammar.github.io/illustrated-transformer/)。
 
 优点：生态成熟、理解充分、训练稳定，单位参数性能高。  
@@ -1159,6 +1138,7 @@ Dense transformers（稠密 Transformer）
 在内存受限场景或 LLM 初学者手中，这通常是默认选择。
 
 Mixture of Experts (MoE，混合专家)  
+
 将 Transformer 中的前馈层替换为多个“专家（experts）”。对每个 token，门控网络（gating network）只把它路由到少数几个专家。结果是用一小部分计算量获得大网络的容量。例如 [Kimi K2](https://huggingface.co/moonshotai/Kimi-K2-Instruct) 总参数量 1T，但每个 token 只激活 32B。代价是所有专家都必须加载到内存。可视化指南见[这篇博客](https://newsletter.maartengrootendorst.com/p/a-visual-guide-to-mixture-of-experts)。
 
 优点：训练与推理的单位计算性能更高。
@@ -1219,15 +1199,15 @@ BPE（Byte-Pair Encoding，字节对编码）（[Sennrich et al., 2016](https://
 
 为了评估分词器的表现，我们可以采用 FineWeb2（[Penedo et al., 2025](https://arxiv.org/abs/2506.20920)）中使用的两项关键指标。
 
-Fertility（生育度）：
+Fertility（生成密度）：
 
-它衡量编码一个单词所需的平均 token 数。生育度越低，压缩率越高，训练与推理速度也越快。可以这样理解：如果某个分词器对大多数单词需要多一两个 token，而另一个分词器用更少的 token 就能完成，那么后者显然更高效。
+它衡量编码一个单词所需的平均 token 数。生成密度越低，压缩率越高，训练与推理速度也越快。可以这样理解：如果某个分词器对大多数单词需要多一两个 token，而另一个分词器用更少的 token 就能完成，那么后者显然更高效。
 
-衡量 fertility（生育率）的标准做法是计算 words-to-tokens ratio（词-词元比，即 word fertility），它衡量平均每个词需要多少个词元。该指标围绕“词”这一概念定义，因为在具备合适分词器（word tokenizer）的情况下，它能在跨语言比较中提供有意义的结果，例如在 [Spacy](https://spacy.io/) 和 [Stanza](https://stanfordnlp.github.io/stanza) 中（[Penedo et al., 2025](https://arxiv.org/abs/2506.20920)）。
+衡量 fertility（生成密度）的标准做法是计算 words-to-tokens ratio（词-词元比，即 word fertility），它衡量平均每个词需要多少个词元。该指标围绕“词”这一概念定义，因为在具备合适分词器（word tokenizer）的情况下，它能在跨语言比较中提供有意义的结果，例如在 [Spacy](https://spacy.io/) 和 [Stanza](https://stanfordnlp.github.io/stanza) 中（[Penedo et al., 2025](https://arxiv.org/abs/2506.20920)）。
 
 在单一语言内比较不同 tokenizer（分词器）时，也可以用字符数或字节数代替词数，得到 characters-to-tokens ratio（字符-词元比）或 bytes-to-tokens ratio（字节-词元比）（[Dagan et al., 2024](https://arxiv.org/abs/2402.01035)）。然而，这些指标在跨语言比较中存在局限：字节数可能因不同文字的字节表示不同而失真（例如，汉字在 UTF-8 中占 3 字节，而拉丁字母占 1–2 字节）；同样，仅用字符数无法反映不同语言单词长度差异巨大——例如，中文词通常比德语复合词短得多。
 
-Proportion of continued words（续词比例）：
+Proportion of continued words（分词率）：
 
 该指标告诉我们有多少比例的词被切分成多段。比例越低越好，意味着更少词被碎片化，从而使分词更高效。
 
@@ -1243,3 +1223,14 @@ def compute_tokenizer_metrics(tokenizer, word_tokenizer, text):
     Returns:
         tuple: (fertility, proportion_continued_words)
             - fertility: average tokens per word (lower is better)
+            - proportion_continued_words: percentage of words split into 2+ tokens (lower is better)
+    """
+    words = word_tokenizer.word_tokenize(text)
+    tokens = tokenizer.batch_encode_plus(words, add_special_tokens=False)
+    tokens_per_word = np.array(list(map(len, tokens["input_ids"])))
+    
+    fertility = np.mean(tokens_per_word).item()
+    proportion_continued_words = (tokens_per_word >= 2).sum() / len(tokens_per_word)
+    
+    return fertility, proportion_continued_words
+```

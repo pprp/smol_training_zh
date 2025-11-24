@@ -1,20 +1,8 @@
-            - proportion_continued_words: percentage of words split into 2+ tokens (lower is better)
-```
 
-```python
-    words = word_tokenizer.word_tokenize(text)
-    tokens = tokenizer.batch_encode_plus(words, add_special_tokens=False)
-    tokens_per_word = np.array(list(map(len, tokens["input_ids"])))
-    
-    fertility = np.mean(tokens_per_word).item()
-    proportion_continued_words = (tokens_per_word >= 2).sum() / len(tokens_per_word)
-    
-    return fertility, proportion_continued_words
-```
 
-对于代码和数学等专业领域，除了生育率（fertility）之外，我们还需要更深入地研究分词器（tokenizer）处理领域特定模式的能力。大多数现代分词器会对单个数字进行拆分（例如将“123”拆分为[“1”, “2”, “3”]）（[Chowdhery et al., 2022](https://arxiv.org/abs/2204.02311)；[DeepSeek-AI et al., 2024](https://arxiv.org/abs/2405.04434)）。将数字拆分开来可能看起来有违直觉，但实际上这有助于模型更有效地学习算术模式。如果“342792”被编码为一个不可分割的token（词元），那么模型必须记住该特定token与其他所有数字token相加、相减或相乘的结果。但当它被拆分时，模型就能学习数字级别的运算规律。一些分词器（如Llama3，[Grattafiori et al., 2024](https://arxiv.org/abs/2407.21783)）会将1到999的数字编码为唯一token，其余数字则由这些token组合而成。
+对于代码和数学等专业领域，除了生成密度（fertility）之外，我们还需要更深入地研究分词器（tokenizer）处理领域特定模式的能力。大多数现代分词器会对单个数字进行拆分（例如将“123”拆分为[“1”, “2”, “3”]）（[Chowdhery et al., 2022](https://arxiv.org/abs/2204.02311)；[DeepSeek-AI et al., 2024](https://arxiv.org/abs/2405.04434)）。将数字拆分开来可能看起来有违直觉，但实际上这有助于模型更有效地学习算术模式。如果“342792”被编码为一个不可分割的token（词元），那么模型必须记住该特定token与其他所有数字token相加、相减或相乘的结果。但当它被拆分时，模型就能学习数字级别的运算规律。一些分词器（如Llama3，[Grattafiori et al., 2024](https://arxiv.org/abs/2407.21783)）会将1到999的数字编码为唯一token，其余数字则由这些token组合而成。
 
-因此，我们可以通过测量目标领域的生育率（fertility）来评估分词器的优缺点。下表比较了不同流行分词器在多种语言和领域中的生育率。
+因此，我们可以通过测量目标领域的生成密度（fertility）来评估分词器的优缺点。下表比较了不同流行分词器在多种语言和领域中的生成密度。
 
 评估分词器（Evaluating tokenizers）
 
@@ -24,11 +12,9 @@
 
 ```
 pip install transformers datasets sentencepiece 'datatrove[multilingual]'
-```
 
 ## 我们需要 datatrove 来加载 word tokenizers（词元分析器）
 
-```
 tokenizers = [
     ("Llama3", "meta-llama/Llama-3.2-1B"),
     ("Gemma3", "google/gemma-3-1b-pt"),
@@ -121,15 +107,11 @@ tokenizer    language  fertility       pcw
 
 结果显示，根据你的优先级，存在一些优胜者和权衡取舍：
 
-##### 生育力（tokens per word）
+- 生成密度（tokens per word）越低越好
 
-越低越好
+- 分词率（%）越低越好
 
-##### 续词比例（%）
-
-越低越好
-
-Gemma3 分词器（tokenizer）在多种语言上实现了较低的“生育率”（fertility）和分词率，尤其在英语、法语和西班牙语上表现突出，这可以归因于其分词器训练数据以及高达 262k 的超大词表规模，约为 Llama3 128k 的两倍。Qwen3 分词器在中文上表现优异，但在英语、法语和西班牙语上落后于 Llama3 的分词器。Mistral Small 的分词器（[Mistral AI, 2025](https://mistral.ai/news/mistral-small-3-1)）在阿拉伯语上表现最佳，但在英语和中文上不及其他分词器。
+Gemma3 分词器（tokenizer）在多种语言上实现了较低的“生成密度”（fertility）和分词率，尤其在英语、法语和西班牙语上表现突出，这可以归因于其分词器训练数据以及高达 262k 的超大词表规模，约为 Llama3 128k 的两倍。Qwen3 分词器在中文上表现优异，但在英语、法语和西班牙语上落后于 Llama3 的分词器。Mistral Small 的分词器（[Mistral AI, 2025](https://mistral.ai/news/mistral-small-3-1)）在阿拉伯语上表现最佳，但在英语和中文上不及其他分词器。
 
 在现有分词器与自定义分词器之间做选择目前，已有不少优秀的分词器可供选择。许多近期模型以 GPT4 的分词器（[OpenAI et al., 2024](https://arxiv.org/abs/2303.08774)）为起点，并额外扩充多语言词元（token）。如上表所示，Llama 3 的分词器在多语言文本和代码上的平均表现良好，而 Qwen 2.5 在中文及某些低资源语言上尤为出色。
 
@@ -150,19 +132,19 @@ SmolLM 系列致力于突破小模型的能力边界。SmolLM2 推出了 135M、
 
 以下是我们最终敲定训练方案前所做的测试：
 
-分词器（Tokenizer）： 在深入架构修改之前，我们需要选择一个分词器。我们找到了一组覆盖目标语言和领域的优秀分词器。基于我们的生育率（fertility）分析，Llama3.2 的分词器在 6 种目标语言之间提供了最佳权衡，同时将词汇表保持在 128k——足够大以实现多语言效率，但又不会大到让嵌入权重膨胀我们的 3B 参数量。
+- 分词器（Tokenizer）： 在深入架构修改之前，我们需要选择一个分词器。我们找到了一组覆盖目标语言和领域的优秀分词器。基于我们的生成密度（fertility）分析，Llama3.2 的分词器在 6 种目标语言之间提供了最佳权衡，同时将词汇表保持在 128k——足够大以实现多语言效率，但又不会大到让嵌入权重膨胀我们的 3B 参数量。
 
-分组查询注意力（Grouped Query Attention, GQA）： 我们再次证实了此前的发现：在 3B 规模、100B token 的条件下，4 组 GQA 的性能与多头注意力（Multi-Head Attention）相当。KV 缓存的效率提升实在无法忽视，尤其是在内存宝贵的设备端部署场景。
+- 分组查询注意力（Grouped Query Attention, GQA）： 我们再次证实了此前的发现：在 3B 规模、100B token 的条件下，4 组 GQA 的性能与多头注意力（Multi-Head Attention）相当。KV 缓存的效率提升实在无法忽视，尤其是在内存宝贵的设备端部署场景。
 
-用于长上下文的 NoPE： 我们通过在每第 4 层移除 RoPE 实现了 NoPE。我们的 3B 消融实验证实了上一节的发现：NoPE 在提升长上下文处理能力的同时，没有牺牲短上下文性能。
+- 用于长上下文的 NoPE： 我们通过在每第 4 层移除 RoPE 实现了 NoPE。我们的 3B 消融实验证实了上一节的发现：NoPE 在提升长上下文处理能力的同时，没有牺牲短上下文性能。
 
-文档内注意力掩码（Intra-document attention masking）： 训练时我们阻止跨文档注意力，以在超长序列训练时提升训练速度与稳定性；再次发现这不会影响下游性能。
+- 文档内注意力掩码（Intra-document attention masking）： 训练时我们阻止跨文档注意力，以在超长序列训练时提升训练速度与稳定性；再次发现这不会影响下游性能。
 
-模型布局优化（Model layout optimization）： 我们比较了文献中近期 3B 模型的布局，有的优先深度，有的优先宽度。我们在自己的训练设置上测试了 Qwen2.5-3B（3.1B）、Llama3.2-3B（3.2B）和 Falcon3-H1-3B（3.1B）的布局，其中深度和宽度各不相同。结果很有趣：尽管 Qwen2.5-3B 的实际参数量更少，所有布局在损失和下游性能上几乎一致。但 Qwen2.5-3B 更深的架构与研究显示“网络深度有益于泛化”（[Petty et al., 2024](https://arxiv.org/abs/2310.19956)）相符。因此，我们选择了更深的布局，押注它在训练推进过程中会带来帮助。
+- 模型布局优化（Model layout optimization）： 我们比较了文献中近期 3B 模型的布局，有的优先深度，有的优先宽度。我们在自己的训练设置上测试了 Qwen2.5-3B（3.1B）、Llama3.2-3B（3.2B）和 Falcon3-H1-3B（3.1B）的布局，其中深度和宽度各不相同。结果很有趣：尽管 Qwen2.5-3B 的实际参数量更少，所有布局在损失和下游性能上几乎一致。但 Qwen2.5-3B 更深的架构与研究显示“网络深度有益于泛化”（[Petty et al., 2024](https://arxiv.org/abs/2310.19956)）相符。因此，我们选择了更深的布局，押注它在训练推进过程中会带来帮助。
 
-文档内注意力掩码（Intra-document attention masking）： 训练时我们阻止跨文档注意力，以在超长序列训练时提升训练速度与稳定性；再次发现这不会影响下游性能。
+- 文档内注意力掩码（Intra-document attention masking）： 训练时我们阻止跨文档注意力，以在超长序列训练时提升训练速度与稳定性；再次发现这不会影响下游性能。
 
-稳定性改进：我们保留了 SmolLM2 的 tied embeddings（共享嵌入），但借鉴 OLMo2 的做法增加了一个新技巧——对 embeddings（嵌入）不再施加 weight decay（权重衰减）。我们的消融实验表明，这样做既不会损害性能，又能降低嵌入的范数，有助于防止训练发散。
+- 稳定性改进：我们保留了 SmolLM2 的 tied embeddings（共享嵌入），但借鉴 OLMo2 的做法增加了一个新技巧——对 embeddings（嵌入）不再施加 weight decay（权重衰减）。我们的消融实验表明，这样做既不会损害性能，又能降低嵌入的范数，有助于防止训练发散。
 
 这种系统性消融实验的美妙之处在于，我们可以放心地将所有这些改动组合在一起，因为每一项都经过了验证。
 
@@ -180,7 +162,7 @@ SmolLM 系列致力于突破小模型的能力边界。SmolLM2 推出了 135M、
 
 规模效应真实存在——尽可能在目标规模重新消融。 不要假设小规模的消融结果在目标模型规模下完全成立。如果有算力，尽量重新确认它们。
 
-在实际领域验证分词器效率。 在目标语言和领域上的 fertility（生育率）指标比追随最新模型使用的方案更重要。一个 50k 的英文分词器无法胜任严肃的多语言工作，但如果你并未覆盖那么多语言，也不需要 256k 的词表。
+在实际领域验证分词器效率。 在目标语言和领域上的 fertility（生成密度）指标比追随最新模型使用的方案更重要。一个 50k 的英文分词器无法胜任严肃的多语言工作，但如果你并未覆盖那么多语言，也不需要 256k 的词表。
 
 既然模型架构已定，接下来就该解决驱动学习过程的优化器与超参数了。
 
@@ -219,8 +201,6 @@ AdamW
 
 Adam（Adaptive Momentum Estimation，自适应动量估计）是一种一阶（first order）优化技术。这意味着除了查看梯度本身，我们还会考虑权重在前几步中的变化量。这使得每个参数的学习率能够根据动量（momentum）自适应调整。
 
-细心的读者可能会问：嘿，你是不是漏掉了一个 W？确实如此！我们特意加上 W（=weight decay，权重衰减）的原因如下。在标准 SGD 中，我们只需在损失函数里加上 $ \lambda \theta^2 $（其中 $ \theta $ 为权重）即可应用 L2 正则化。然而，如果在 Adam 中同样这么做，自适应学习率也会影响到 L2 正则化。这意味着正则化强度会变得依赖于梯度大小，从而削弱其效果。这不是我们想要的，因此 AdamW 将其与主优化循环解耦（decoupled）以解决这一问题。
-
 细心的读者可能会问：嘿，你是不是漏掉了一个 W？确实如此！我们特意加上 W（=weight decay，权重衰减）的原因如下。在标准 SGD 中，我们只需在损失函数里加上 $\lambda \theta^2$（其中 $\theta$ 为权重）即可应用 L2 正则化。然而，如果在 Adam 中同样这么做，自适应学习率也会影响到 L2 正则化。这意味着正则化强度会变得依赖于梯度大小，从而削弱其效果。这不是我们想要的，因此 AdamW 将其与主优化循环解耦（decoupled）以解决这一问题。
 
 有趣的是，在过去几年里，AdamW 的超参数几乎纹丝不动：
@@ -235,14 +215,12 @@ Muon 一句话总结
 
 Adam 是一阶方法，因为它只使用梯度。Muon 是一个二阶优化器，它对参数张量的矩阵视图进行操作。
 
-```latex
-\begin{aligned}
+$$
 G_t &= \nabla_{\theta}\mathcal{L}_t(\theta_{t-1}) \\
 B_t &= \mu\, B_{t-1} + G_t \\
 O_t &= \mathrm{NewtonSchulz5}(B_t) \ \approx\ U V^\top \quad \text{if } B_t = U\Sigma V^\top \text{ (SVD)} \\
 \theta_t &= \theta_{t-1} - \eta\, O_t
-\end{aligned}
-```
+$$
 
 看到这些公式，你可能会疑惑：这为什么是二阶方法？我只看到了梯度，没看到更高阶项。实际上，二阶优化发生在 Newton-Schulz 步骤内部，但这里不再深入展开。已经有高质量的博客深入解释了 Muon，因此这里只列出 Muon 的三个核心思想：
 
@@ -650,12 +628,12 @@ Checkpoint 与自动恢复系统： 确认 checkpoint 能正确保存，且训�
 
 为验证这一点，我们保持其余配置完全一致，仅把训练步数从 32 k 调到 3.2 M。所用配置见[此处](https://huggingface.co/datasets/HuggingFaceTB/ablations-training-configs/tree/main/throughput_debugging)：
 
-## 短跑 (32k steps)
+短期 (32k steps)
 - "lr_decay_starting_step": 2560000
 - "lr_decay_steps": 640000
 - "train_steps": 3200000
 
-## 长周期运行（3.2 M steps）
+长周期运行（3.2 M steps）
 + "lr_decay_starting_step": 26000
 + "lr_decay_steps": 6000
 + "train_steps": 32000
@@ -803,13 +781,16 @@ index 1234567..abcdefg 100644
 
 下图展示了我们3个训练阶段以及在训练过程中 web/code/math 比例的演变。每个阶段的 SmolLM3 训练配置可在[此处](https://github.com/huggingface/smollm/tree/main/text/pretraining/smollm3)获取，包含精确的数据权重。有关每个阶段背后的原理和构成的更多详细信息，请参阅数据整理部分。
 
-阶段1：基础训练（8T tokens，4k 上下文）  
+阶段1：基础训练（8T tokens，4k 上下文） 
+
 基础阶段使用我们的核心预训练混合数据：web 数据（FineWeb-Edu、DCLM、FineWeb2、FineWeb2-HQ）、来自 The Stack v2 和 StarCoder2 的代码（code），以及来自 FineMath3+ 和 InfiWebMath3+ 的数学（math）数据。所有训练均在 4k 上下文长度下进行。
 
-阶段2：高质量注入（2T tokens，4k 上下文）  
+阶段2：高质量注入（2T tokens，4k 上下文） 
+
 我们引入更高质量过滤后的数据集：用于代码的 Stack-Edu、用于数学的 FineMath4+ 和 InfiWebMath4+，以及用于高级数学推理的 MegaMath（我们添加了 Qwen Q&A 数据、合成重写以及文本-代码交错块）。
 
-阶段3：带推理与 Q&A 数据的学习率衰减（1.1T tokens，4k 上下文）  
+阶段3：带推理与 Q&A 数据的学习率衰减（1.1T tokens，4k 上下文） 
+
 在学习率衰减阶段，我们进一步上采样高质量的代码和数学数据集，同时引入指令和推理数据，如 OpenMathReasoning、OpenCodeReasoning 和 OpenMathInstruct。Q&A 样本仅通过换行符拼接并分隔。
 
 #### [长上下文扩展：从 4k 到 128k tokens](https://huggingfacetb-smol-training-playbook.hf.space/#long-context-extension-from-4k-to-128k-tokens)
@@ -831,6 +812,7 @@ index 1234567..abcdefg 100644
 RoPE ABF（RoPE with Adjusted Base Frequency，带调整基频的 RoPE）： 当上下文从 4k 扩展到 32k 时，我们将 RoPE theta（基频）提高到 2M；再从 32k 扩展到 64k 时，将其提高到 5M。我们发现，使用更大的值（如 10M）会略微提升 RULER 分数，但会损害 GSM8k 等短上下文任务，因此我们保留了不影响短上下文的 5M。在此上下文扩展阶段，我们还借机进一步上采样了数学、代码和推理问答数据，并以 ChatML 格式新增了数十万个样本。
 
 YARN 外推：直达 128k  
+
 即便已在 64k 上下文上完成训练，我们仍希望 SmolLM3 在推理时能处理 128k。与其在 128k 序列上继续训练（成本过高），我们采用了 YARN（Yet Another RoPE extensioN method，又一种 RoPE 扩展方法）（[B. Peng et al., 2023](https://arxiv.org/abs/2309.00071)），它允许模型在训练长度之外进行外推。理论上，YARN 可将序列长度提升四倍。我们发现，使用 64k 检查点在 128k 上的表现优于 32k 检查点，这证实了“训练长度越接近目标推理长度，效果越好”。然而，当继续外推到 256k（从 64k 再翻四倍）时，Ruler 指标出现下降，因此我们建议将模型使用上限控制在 128k。
 
 至此，我们已完整回顾了 SmolLM3 的预训练之旅——从规划与消融实验，到最终训练运行，以及一路上的幕后挑战。
@@ -929,7 +911,7 @@ YARN 外推：直达 128k
 
 *   多语言（Multilinguality）。遗憾的是，测试模型多语言能力的选项并不多。我们目前依赖 Global MMLU（Singh et al., 2025）来覆盖我们模型应表现良好的主要语言，并辅以 MGSM（Shi et al., 2022）作为多语言数学能力的测试。
 
-1.   综合任务评测（Integrated task evals）
+2. 综合任务评测（Integrated task evals）
 
 这些评测测试的内容与我们即将发布的功能非常接近：多轮推理（multi-turn reasoning）、长上下文（long-context）使用，以及半真实场景下的工具调用（tool calls）。
 
@@ -939,17 +921,17 @@ YARN 外推：直达 128k
 *   对齐（Alignment）。衡量模型与用户意图的对齐程度通常依赖人工标注者或公共排行榜（如 [LMArena](https://lmarena.ai/)）。这是因为自由形式生成、风格或整体有用性等品质难以用自动化指标量化。然而，在所有情况下，运行这些评估都非常昂贵，因此社区转而使用大语言模型（LLM）作为人类偏好的代理。此类最受欢迎的基准包括 AlpacaEval（[Dubois et al., 2025](https://arxiv.org/abs/2404.04475)）、ArenaHard（[T. Li et al., 2024](https://arxiv.org/abs/2406.11939)）和 MixEval（[Ni et al., 2024](https://arxiv.org/abs/2406.06565)），其中后者与 LMArena 上的人类 Elo 评分相关性最强。
 *   工具调用（Tool calling）。[BFCL](https://gorilla.cs.berkeley.edu/leaderboard.html) 提供了全面的工具调用测试，尽管它往往很快就被“刷饱和”。TAU-Bench（[Barres et al., 2025](https://arxiv.org/abs/2506.07982)）则测试模型在模拟客服场景中使用工具并解决用户问题的能力，也已成为常被引用的热门基准。
 
-1.   防过拟合评估（Overfitting-prevention evals）
+3. 防过拟合评估（Overfitting-prevention evals）
 
 为了测试模型是否对某项特定技能过拟合，我们在评估集中加入了一些鲁棒性或适应性评估，例如 GSMPlus（[Q. Li 等，2024](https://arxiv.org/abs/2402.19255)），它通过对 GSM8k（[Cobbe 等，2021](https://arxiv.org/abs/2110.14168)）中的题目进行扰动，来检验模型是否仍能解决难度相当的问题。
 
-1. 内部评估（Internal evals）
+4. 内部评估（Internal evals）
 
 尽管公开基准（public benchmarks）在模型开发过程中能提供一定参考，但它们无法替代针对特定能力自行实现的内部评估，也无法替代让内部专家直接与模型交互。
 
 例如，针对 SmolLM3，我们需要一个基准来评估模型是否具备多轮推理（multi-turn reasoning）能力，于是我们实现了一个 Multi-IF 的变体来衡量这一点。
 
-1. 氛围评估与竞技场（Vibe evaluations and arenas）
+5. 氛围评估与竞技场（Vibe evaluations and arenas）
 
 同样，我们发现对中间检查点进行“氛围测试”（vibe testing，即与模型交互）对于发现评估分数无法捕捉的模型行为中的细微怪癖至关重要。正如我们稍后讨论的，氛围测试曾发现数据处理代码中的一个 bug：所有系统消息（system messages）都从语料中被删除了！这也可以在大规模上进行，以衡量人类偏好，例如流行的 [LMArena](https://lmarena.ai/)。然而，众包人类评估往往不够稳定（倾向于讨好和华丽辞藻而非实际有用性），因此应将其视为低信号反馈。
 

@@ -133,17 +133,7 @@ Smollm3 在 AIME25 上使用 RLVR 的下游性能。
 
 在开源生态中，GRPO 和 REINFORCE 等强化学习方法最为常用，不过 Qwen3 技术报告（[A. Yang, Li, et al., 2025](https://arxiv.org/abs/2505.09388)）强调了使用 on-policy distillation（同策略蒸馏）来训练 32B 以下参数的模型：
 
-```mermaid
-flowchart LR
-    subgraph Flagship ["旗舰模型"]
-        Base1["Base Models"] --> Stage1["Stage 1:
 
-Long-CoT Cold Start"]
-        Stage1 --> Stage2["Stage 2:
-
-Reasoning RL"]
-        Stage2 --> Stage3["Stage 3:
-```
 
 ```mermaid
 graph TD
@@ -277,9 +267,6 @@ _表格显示不同精度与 GPU 代际下的理论 TFLOPs（TeraFLOPs，万亿�
 吞吐量的显著提升并不仅仅是“跑得快”，它反映了我们看待数值计算方式的根本转变。FP8（8 位浮点）和 FP4（4 位浮点）让模型在每 瓦特（watt） 、每 秒（second） 内完成更多运算，因而成为大规模训练与推理的关键。H100 在 FP8 下达到 3960 TFLOPs，比 FP16/BF16 提升 4 倍；而 B200 在 FP4 下冲到 10,000 TFLOPs，更进一步刷新上限。
 
 理解这些数字：这些理论峰值 FLOPs 代表在理想条件下所能实现的_最大计算吞吐量_，即所有计算单元满载且数据随时就绪。实际性能则高度取决于你的工作负载能否持续“喂饱”计算单元，以及你的运算能否高效映射到可用硬件。
-
-<!-- 
-For SmolLM3, we were going to train on NVIDIA H100 80GB HBM3 GPUs, so we first wanted to test the H100’s theoretical TFLOPs specifications against real world performance. For this, we used the [SemiAnalysis GEMM benchmark](https://www.ray.so/#theme=prisma&darkMode=false&code=IyBBTUQgVklQIGltYWdlCmFsaWFzIGRydW49InN1ZG8gZG9ja2VyIHJ1biAtLXByaXZpbGVnZWQgLS1uZXR3b3JrPWhvc3QgLS1kZXZpY2U9L2Rldi9rZmQgLS1kZXZpY2U9L2Rldi9kcmkgLS1ncm91cC1hZGQgdmlkZW8gLS1jYXAtYWRkPVNZU19QVFJBQ0UgLS1zZWN1cml0eS1vcHQgc2VjY29tcD11bmNvbmZpbmVkIC0taXBjPWhvc3QgLS1zaG0tc2l6ZT0xOTI2IC0tcm0gLWl0IgpkcnVuIHNlbWlhbmFseXNpc3dvcmsvYW1kLW1hdG11bDpsYXRlc3QKRElTQUJMRV9BREROX0hJUF9MVD0wIFBZVE9SQ0hfVFVOQUJMRV9PUF9FTkFCTEVEPTEgcHl0aG9uIG1hdG11bC5weQoKI0FNRCBweXBpIG5pZ2h0bHkKZHJ1biBhbWQtbGF0ZXN0LXB5cGktbmlnaHRseS1tYXRtdWwKUFlUT1JDSF9UVU5BQkxFX09QX0VOQUJMRUQ9MSBweXRob24gbWF0bXVsLnB5CgojIEFNRCBweXBpIHN0YWJsZSBQeVRvcmNoIDIuNS4xCmRydW4gc2VtaWFuYWx5c2lzd29yay9hbWQtbGF0ZXN0LXB5cGktc3RhYmxlLW1hdG11bApQWVRPUkNIX1RVTkFCTEVfT1BfRU5BQkxFRD0xIHB5dGhvbiBtYXRtdWwucHkKCiMgTnZpZGlhIHN0YWJsZSAyNC4wOQphbGlhcyBkcnVuPSJkb2NrZXIgcnVuIC0tcm0gLWl0IC0tZ3B1cyBhbGwgLS1pcGM9aG9zdCAtLW5ldD1ob3N0IC0tc2htLXNpemU9MTkyNiIKZHJ1biBzZW1pYW5hbHlzaXN3b3JrL252aWRpYS1tYXRtdWw6bGF0ZXN0CnB5dGhvbiBtYXRtdWwucHkKCg&language=shell): it [tests throughput on real-world matrix multiplication shapes from Meta’s Llama 70B training](https://newsletter.semianalysis.com/p/mi300x-vs-h100-vs-h200-benchmark-part-1-training#general-matrix-multiply-gemm-performance). -->
 
 对于 SmolLM3，我们打算在 NVIDIA H100 80 GB HBM3 GPU 上进行训练，因此首先想验证 H100 的理论 TFLOPs 指标与真实世界性能是否一致。为此，我们使用了 [SemiAnalysis 的 GEMM 基准测试](https://www.ray.so/#theme=prisma&darkMode=false&code=IyBBTUQgVklQIGltYWdlCmFsaWFzIGRydW49InN1ZG8gZG9ja2VyIHJ1biAtLXByaXZpbGVnZWQgLS1uZXR3b3JrPWhvc3QgLS1kZXZpY2U9L2Rldi9rZmQgLS1kZXZpY2U9L2Rldi9kcmkgLS1ncm91cC1hZGQgdmlkZW8gLS1jYXAtYWRkPVNZU19QVFJBQ0UgLS1zZWN1cml0eS1vcHQgc2VjY29tcD11bmNvbmZpbmVkIC0taXBjPWhvc3QgLS1zaG0tc2l6ZT0xOTI2IC0tcm0gLWl0IgpkcnVuIHNlbWlhbmFseXNpc3dvcmsvYW1kLW1hdG11bDpsYXRlc3QKRElTQUJMRV9BREROX0hJUF9MVD0wIFBZVE9SQ0hfVFVOQUJMRV9PUF9FTkFCTEVEPTEgcHl0aG9uIG1hdG11bC5weQoKIyBBTUQgcHlwaSBuaWdodGx5CmRydW4gYW1kLWxhdGVzdC1weXBpLW5pZ2h0bHktbWF0bXVsClBZVE9SQ0hfVFVOQUJMRV9PUF9FTkFCTEVEPTEgcHl0aG9uIG1hdG11bC5weQoKIyBBTUQgcHlwaSBzdGFibGUgUHlUb3JjaCAyLjUuMQpkcnVuIHNlbWlhbmFseXNpc3dvcmsvYW1kLWxhdGVzdC1weXBpLXN0YWJsZS1tYXRtdWwKUFlUT1JDSF9UVU5BQkxFX09QX0VOQUJMRUQ9MSBweXRob24gbWF0bXVsLnB5CgojIE52aWRpYSBzdGFibGUgMjQuMDkKYWxpYXMgZHJ1bj0iZG9ja2VyIHJ1biAtLXJtIC1pdCAtLWdwdXMgYWxsIC0taXBjPWhvc3QgLS1uZXQ9aG9zdCAtLXNobS1zaXplPTE5MjYiCmRydW4gc2VtaWFuYWx5c2lzd29yay9udmlkaWEtbWF0bXVsOmxhdGVzdApweXRob24gbWF0bXVsLnB5Cgo&language=shell)：该基准使用 Meta Llama 70B 训练中的真实矩阵乘法形状来测试吞吐。
 
@@ -469,7 +456,7 @@ DGX H100。来源：NVIDIA
 
 每条链路的带宽和延迟（latency）特性各不相同，理解它们有助于定位训练管线中的瓶颈。为方便理解，我们绘制了一张简化示意图，突出最重要的组件与通信链路：
 
-带宽上限  
+带宽上限 
 CPU → GPU  
 -  
 GB/s
@@ -634,22 +621,19 @@ GPUDirect RDMA（Remote Direct Memory Access，远程直接内存访问，简称
 
 ```
 $ lstopo -v
-...
 
 ## 我们可以在每个 PCIe 交换机上看到 4 个这样的 EFA 设备
 PCIBridge L#8 (busid=0000:46:01.0 id=1d0f:0200 class=0604(PCIBridge) link=15.75GB/s buses=0000:[4f-4f] PCIVendor="Amazon.com, Inc.")
 PCI L#6 (busid=0000:4f:00.0 id=1d0f:efa1 class=0200(Ethernet) link=15.75GB/s PCISlot=82-1 PCIVendor="Amazon.com, Inc.")
     OpenFabrics L#4 (NodeGUID=cd77:f833:0000:1001 SysImageGUID=0000:0000:0000:0000 Port1State=4 Port1LID=0x0 Port1LMC=1 Port1GID0=fe80:0000:0000:0000:14b0:33ff:fef8:77cd) "rdmap79s0"
-...
 
-```
 fi_info --verbose
-        fi_link_attr:
-            address: EFA-fe80::14b0:33ff:fef8:77cd
-            mtu: 8760            # 最大数据包大小为 8760 字节
-            speed: 100000000000  # 每个 EFA 链路提供 100 Gbps 带宽
-            state: FI_LINK_UP
-            network_type: Ethernet
+fi_link_attr:
+    address: EFA-fe80::14b0:33ff:fef8:77cd
+    mtu: 8760            # 最大数据包大小为 8760 字节
+    speed: 100000000000  # 每个 EFA 链路提供 100 Gbps 带宽
+    state: FI_LINK_UP
+    network_type: Ethernet
 ```
 
 每个 EFA 链路（EFA link） 提供 100 Gbps（12.5 GB/s）带宽。每个 GPU 配备 4 个 EFA 网卡（EFA NICs），每节点 8 块 GPU，因此每节点总带宽为 $100 \times 4 \times 8 = 3200$ Gbps（400 GB/s）。
@@ -828,8 +812,6 @@ CPU 亲和性配置
 网络拓扑与放置
 
 理解网络拓扑对诊断性能问题至关重要。云放置组（placement group）虽有帮助，但无法保证实例间网络跳数最少。在现代数据中心的 fat-tree（胖树）拓扑中，位于不同顶层交换机下的实例会因路由路径中的额外网络跳数而遭遇更高延迟，并可能降低带宽。
-
-<!-- For AWS EC2 users, the [Instance Topology API](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/how-ec2-instance-topology-works.html) provides valuable visibility into network node placement. Instances sharing t”he same network node at the bottom layer (directly connected to the instance) are physically closest and will achieve the lowest latency communication. -->
 
 对于 AWS EC2 用户，[Instance Topology API](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/how-ec2-instance-topology-works.html) 提供了对网络节点放置的清晰视图。共享底层（与实例直接相连）同一网络节点的实例在物理上最接近，彼此通信的延迟也最低。
 
@@ -1255,6 +1237,5 @@ Successfully ran diagnostic for group.
 | Info | GPU 7 Allocated 83892938283 bytes (98.4%) |
 
 +-----  Stress  ------------+------------------------------------------------+
-
-节点预留（Node reservation）： 由于 SmolLM3 是在由 Slurm 管理的集群上训练的，我们为整个训练过程预订了固定的 48 个节点。这种设置让我们能够持续追踪同一批节点的健康与性能，也解决了前文提到的数据存储问题。我们还预留了一个备用节点（就像汽车的备胎），一旦某个节点故障，可立即替换，无需等待维修。空闲时，该备用节点会运行评估任务或开发实验。
+```
 

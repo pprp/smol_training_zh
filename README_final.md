@@ -188,7 +188,7 @@ Bloom 的继任者是 2022 年的 StarCoder（[Li et al., 2023](https://arxiv.or
 | Dense | [Qwen3](https://huggingface.co/collections/Qwen/qwen3-67dd247413f0e2e4f653967f) | 0.6B, 1.7B, 4B, 14B, 32B |
 | Dense | [Gemma3](https://huggingface.co/collections/google/gemma-3-release-67c6c6f89c4f76621268bb6d) | 12B, 27B |
 | Dense | [SmolLM2](https://huggingface.co/collections/HuggingFaceTB/smollm2-6723884218bcda64b34d7db9), [SmolLM3](https://huggingface.co/HuggingFaceTB/SmolLM3-3B) | 135M, 360M, 1.7B, 3B |
-| MoE | [Qwen3 MoE](https://huggingface.co/collections/Qwen/qwen3-67dd247413f0e2e4f653967f) | 30B-A3B, 235B-A122B |
+| MoE | [Qwen3 MoE](https://huggingface.co/collections/Qwen/qwen3-67dd247413f0e2e4f653967f) | 30B-A3B, 235B-A12B |
 | MoE | [GPT-OSS](https://huggingface.co/collections/openai/gpt-oss-68911959590a1634ba11c7a4) | 21B-A3B, 117B-A5B |
 | MoE | [Kimi Moonlight](https://huggingface.co/moonshotai/Moonlight-16B-A3B-Instruct) | 16B-A3B |
 | MoE | [Kimi-k2](https://huggingface.co/collections/moonshotai/kimi-k2-6871243b990f2af5ba60617d) | 1T-A32B |
@@ -279,7 +279,6 @@ Bloom 的继任者是 2022 年的 StarCoder（[Li et al., 2023](https://arxiv.or
 ## 数据集与混合权重（Datasets and mixing weights）
 data_stages:
 - data:
-
     dataset:
       dataset_folder:
       - fineweb-edu
@@ -642,7 +641,7 @@ LLM 有两个嵌入组件：输入嵌入（input embeddings）充当 token 到�
 
 解决方案是位置嵌入（positional embeddings）：一种数学编码，为序列中的每个词元（token）赋予唯一的“地址”。然而，随着我们把上下文长度不断推升——从早期 BERT 的 512 个词元到如今百万词元级别——位置编码（positional encoding）的选择对性能与计算效率都变得愈发关键。
 
-位置编码的演进
+**位置编码的演进**
 
 早期 Transformer 使用简单的绝对位置嵌入（Absolute Position Embeddings, APE）（[Vaswani et al., 2023](https://arxiv.org/abs/1706.03762)），本质上是可学习的查找表，将每个位置（1、2、3…）映射为一个向量，再加到词元嵌入上。这在短序列上表现良好，但有一个重大局限：模型的最大输入序列长度受限于训练时的最大长度，无法直接泛化到更长的序列。
 
@@ -652,7 +651,7 @@ ALiBi（Attention with Linear Biases，线性偏置注意力）（[Press 等，2
 
 但近期大型语言模型中最主流的技术是旋转位置编码（Rotary Position Embedding，RoPE）（[苏 等，2023](https://arxiv.org/abs/2104.09864)）。
 
-RoPE：将位置视为旋转
+**RoPE：将位置视为旋转**
 
 RoPE 的核心洞见是将位置信息编码为高维空间中的旋转角度。它不是把位置向量加到 token 嵌入上，而是将 query 和 key 向量旋转一个与其绝对位置相关的角度。
 
@@ -749,7 +748,7 @@ YaRN（Yet another RoPE extensioN，又一种 RoPE 扩展）（[Peng et al., 202
 
 如今大多数主流模型都使用 RoPE：Llama、Qwen、Gemma 等。该技术已被证明在不同模型规模与架构（dense、MoE、Hybrid）下均表现稳健。让我们看看最近出现的几种 RoPE 变体。
 
-混合位置编码方法
+**混合位置编码方法**
 
 然而，随着模型向越来越大的上下文推进（[Meta AI, 2025](https://ai.meta.com/blog/llama-4-multimodal-intelligence/)；[Yang et al., 2025](https://arxiv.org/abs/2501.15383)），即便是 RoPE 也开始面临性能挑战。在比“针里寻针”（Needle in the Haystack，NIAH）更具挑战性的长上下文基准（如 Ruler 和 HELMET）（[Hsieh et al., 2024](https://arxiv.org/abs/2404.06654)；[Yen et al., 2025](https://arxiv.org/abs/2410.02694)）上评估时，单纯增加 RoPE 频率的标准长上下文扩展方法存在局限。为此，研究者引入了更新的技术。
 
@@ -767,7 +766,7 @@ RNoPE 混合方案： 鉴于上述权衡，[B. Yang et al. (2025)](https://arxiv
 
 损失与评估结果显示，三种配置的性能相近，表明 NoPE（No Position Embedding，无位置编码） 在保持强劲短上下文能力的同时，也为更好的长上下文处理奠定了基础。基于这些结果，我们在 SmolLM3 中采用了 NoPE + 文档掩码（document masking） 的组合。
 
-部分/分块 RoPE（Partial/Fractional RoPE）：  
+**部分/分块 RoPE（Partial/Fractional RoPE）**：  
 另一种互补思路是只对模型维度的一个子集应用 RoPE。与 RNoPE（Remove NoPE） 在整层之间交替使用 RoPE 和 NoPE 不同，Partial RoPE 在同一层内混合二者。近期模型如 GLM-4.5（[5 Team et al., 2025](https://arxiv.org/abs/2508.06471)）或 Minimax-01（[MiniMax et al., 2025](https://arxiv.org/abs/2501.08313)）采用了这一策略，但早在 gpt-j（[Wang & Komatsuzaki, 2021](https://github.com/kingoflolz/mesh-transformer-jax)）等旧模型中就已出现。此外，所有使用 MLA（Multi-head Latent Attention，多头隐式注意力） 的模型都必须采用 Partial RoPE，否则推理成本将高得难以接受。
 
 MLA 通过投影吸收（projection absorption）实现高效推理：不再为每个头存储独立的键 $k_i^{(h)}$，而是缓存一个小的共享隐向量 $c_i = x_i W_c \in \mathbb{R}^{d_c}$，并将头的查询/键映射合并，使得每次打分都很廉价。令 $q_t^{(h)} = x_t W_q^{(h)}$ 与 $k_i^{(h)} = c_i E^{(h)}$，定义 $U^{(h)} = W_q^{(h)} E^{(h)}$，可得：
@@ -787,7 +786,7 @@ $$
 解决方案：部分 RoPE（Partial RoPE）。  
 将头维度拆分为 $d_k = d_{\text{nope}} + d_{\text{rope}}$，在大块上不施加旋转（像以前一样吸收：$(x_t U_{\text{nope}}^{(h)})^\top c_i$），仅在小块上应用 RoPE。
 
-限制长上下文的注意力范围
+**限制长上下文的注意力范围**
 
 到目前为止，我们已经探讨了如何处理长上下文的位置信息：激活 RoPE、禁用它（NoPE）、仅在部分层上应用（RNoPE）或仅在某些隐藏维度上应用（Partial RoPE），或者调整其频率（ABF、YaRN）。这些方法通过修改模型如何编码位置，来处理比训练时更长的序列。但还有一种互补策略：与其调整位置编码，不如限制哪些 token 可以相互关注。
 
@@ -903,49 +902,28 @@ $$
 ![Image 4: Image](https://huggingfacetb-smol-training-playbook.hf.space/_astro/Capture_decran_2025-10-20_a_13_25_47_2921384e-bcac-8087-83e5-fa7a40c1f342.asYkEXKU_1s8wtB.webp)
 
 ![Image 5: Image](https://huggingfacetb-smol-training-playbook.hf.space/_astro/Capture_decran_2025-10-20_a_13_26_08_2921384e-bcac-80b5-ac36-fb73d6374208.D-BBIjb7_Zs7nQa.webp)
-<!-- 
-Here is a table with the sparsity of some MoE model:
 
-| Model | Total experts | Activated per token (incl. shared) | Sparsity |
-| --- | --- | --- | --- || Mixtral-8×7B | 8 | 2 | 4.0 |
-| Grok-1 | 8 | 2 | 4.0 |
-| Grok-2 | 8 | 2 | 4.0 |
-| OLMoE-1B-7B-0924 | 64 | 8 | 8.0 |
-| gpt-oss 20b | 32 | 4 | 8 |
-| Step-3 | 48 routed + 1 shared = 49 | 3 routed + 1 shared = 4 | 12.25 |
-| GLM-4.5-Air | 128 routed + 1 shared = 129 | 8 routed + 1 shared = 9 | 14.3 |
-| Qwen3-30B-A3B | 128 | 8 | 16.0 |
-| Qwen3-235B-A22B | 128 | 8 | 16.0 |
-| GLM-4.5 | 160 routed + 1 shared = 161 | 8 routed + 1 shared = 9 | 17.8 |
-| DeepSeek-V2 | 160 routed + 2 shared = 162 | 6 routed + 2 shared = 8 | 20.25 |
-| DeepSeek-V3 | 256 routed + 1 shared = 257 | 8 routed + 1 shared = 9 | 28.6 |
-| gpt-oss 120b | 128 | 4 | 32 |
-| Kimi K2 | 384 routed + 1 shared = 385 | 8 routed + 1 shared = 9 | 42.8 |
-| Qwen3-Next-80B-A3B-Instruct | 512 routed + 1 shared = 513 | 10 total active + 1 shared = 11 | 46.6 |
+以下是若干混合专家模型稀疏度的对比表格：
 
-The recent trend is clear: MoE models are getting sparser. That said, the optimal sparsity still depends on hardware and end-to-end efficiency. For example, Step-3 targets peak efficiency and intentionally doesn’t max out sparsity to fit their specific hardware and bandwidth constraints, while gpt-oss-20b have a low sparsity due to on-device memory constraints (the passive expert still take some memory). -->
-
-以下是部分 MoE 模型稀疏度对比表：
-
-| 模型 | 专家总数 | 每 token 激活专家数（含共享） | 稀疏度 |
+| 模型名称 | 专家总数 | 每令牌激活数（含共享） | 稀疏度 |
 | --- | --- | --- | --- |
 | Mixtral-8×7B | 8 | 2 | 4.0 |
 | Grok-1 | 8 | 2 | 4.0 |
 | Grok-2 | 8 | 2 | 4.0 |
 | OLMoE-1B-7B-0924 | 64 | 8 | 8.0 |
 | gpt-oss 20b | 32 | 4 | 8 |
-| Step-3 | 48 路由 + 1 共享 = 49 | 3 路由 + 1 共享 = 4 | 12.25 |
-| GLM-4.5-Air | 128 路由 + 1 共享 = 129 | 8 路由 + 1 共享 = 9 | 14.3 |
+| Step-3 | 48路由+1共享=49 | 3路由+1共享=4 | 12.25 |
+| GLM-4.5-Air | 128路由+1共享=129 | 8路由+1共享=9 | 14.3 |
 | Qwen3-30B-A3B | 128 | 8 | 16.0 |
 | Qwen3-235B-A22B | 128 | 8 | 16.0 |
-| GLM-4.5 | 160 路由 + 1 共享 = 161 | 8 路由 + 1 共享 = 9 | 17.8 |
-| DeepSeek-V2 | 160 路由 + 2 共享 = 162 | 6 路由 + 2 共享 = 8 | 20.25 |
-| DeepSeek-V3 | 256 路由 + 1 共享 = 257 | 8 路由 + 1 共享 = 9 | 28.6 |
+| GLM-4.5 | 160路由+1共享=161 | 8路由+1共享=9 | 17.8 |
+| DeepSeek-V2 | 160路由+2共享=162 | 6路由+2共享=8 | 20.25 |
+| DeepSeek-V3 | 256路由+1共享=257 | 8路由+1共享=9 | 28.6 |
 | gpt-oss 120b | 128 | 4 | 32 |
-| Kimi K2 | 384 路由 + 1 共享 = 385 | 8 路由 + 1 共享 = 9 | 42.8 |
-| Qwen3-Next-80B-A3B-Instruct | 512 路由 + 1 共享 = 513 | 10 活跃 + 1 共享 = 11 | 46.6 |
+| Kimi K2 | 384路由+1共享=385 | 8路由+1共享=9 | 42.8 |
+| Qwen3-Next-80B-A3B-Instruct | 512路由+1共享=513 | 10总激活+1共享=11 | 46.6 |
 
-趋势显而易见：MoE 模型正变得越来越稀疏。不过，最优稀疏度仍取决于硬件与端到端效率。例如，Step-3 追求峰值效率，故意没有将稀疏度拉到极限，以适配其特定硬件与带宽限制；而 gpt-oss-20b 因设备内存限制只能保持较低稀疏度（被动专家仍会占用部分内存）。
+当前趋势非常明显：混合专家模型正朝着更高稀疏度的方向发展。不过最优稀疏度仍取决于硬件条件与端到端效率。例如Step-3模型以峰值效率为目标，特意未追求极限稀疏度以适应其特定硬件与带宽限制；而gpt-oss-20b因受终端设备内存限制（未激活专家仍会占用部分内存），其稀疏度设置相对较低。
 
 粒度
 
@@ -1151,6 +1129,7 @@ $$\mathbf{S}_t \;=\; \mathbf{G}_t \odot \mathbf{S}_{t-1} \;+\; \mathbf{v}_t \mat
 我们已经了解了稠密（dense）、混合专家（MoE, Mixture of Experts）和混合（hybrid）模型，你可能自然想知道该用哪一种？架构选择通常取决于模型部署位置、团队经验以及时间线。我们快速回顾每种架构的优缺点，并给出一个简单的决策流程，帮你找到合适的架构。
 
 Dense transformers（稠密 Transformer）  
+
 标准的纯解码器 Transformer，每个 token 都会激活所有参数。数学推导见 [The Annotated Transformers](https://nlp.seas.harvard.edu/2018/04/03/attention.html)，直观理解可参考 [The Illustrated Transformers](https://jalammar.github.io/illustrated-transformer/)。
 
 优点：生态成熟、理解充分、训练稳定，单位参数性能高。  
@@ -1159,6 +1138,7 @@ Dense transformers（稠密 Transformer）
 在内存受限场景或 LLM 初学者手中，这通常是默认选择。
 
 Mixture of Experts (MoE，混合专家)  
+
 将 Transformer 中的前馈层替换为多个“专家（experts）”。对每个 token，门控网络（gating network）只把它路由到少数几个专家。结果是用一小部分计算量获得大网络的容量。例如 [Kimi K2](https://huggingface.co/moonshotai/Kimi-K2-Instruct) 总参数量 1T，但每个 token 只激活 32B。代价是所有专家都必须加载到内存。可视化指南见[这篇博客](https://newsletter.maartengrootendorst.com/p/a-visual-guide-to-mixture-of-experts)。
 
 优点：训练与推理的单位计算性能更高。
@@ -1244,9 +1224,7 @@ def compute_tokenizer_metrics(tokenizer, word_tokenizer, text):
         tuple: (fertility, proportion_continued_words)
             - fertility: average tokens per word (lower is better)
             - proportion_continued_words: percentage of words split into 2+ tokens (lower is better)
-```
-
-```python
+    """
     words = word_tokenizer.word_tokenize(text)
     tokens = tokenizer.batch_encode_plus(words, add_special_tokens=False)
     tokens_per_word = np.array(list(map(len, tokens["input_ids"])))
@@ -1269,11 +1247,9 @@ def compute_tokenizer_metrics(tokenizer, word_tokenizer, text):
 
 ```
 pip install transformers datasets sentencepiece 'datatrove[multilingual]'
-```
 
 ## 我们需要 datatrove 来加载 word tokenizers（词元分析器）
 
-```
 tokenizers = [
     ("Llama3", "meta-llama/Llama-3.2-1B"),
     ("Gemma3", "google/gemma-3-1b-pt"),
@@ -1366,13 +1342,9 @@ tokenizer    language  fertility       pcw
 
 结果显示，根据你的优先级，存在一些优胜者和权衡取舍：
 
-##### 生成密度（tokens per word）
+- 生成密度（tokens per word）越低越好
 
-越低越好
-
-##### 分词率（%）
-
-越低越好
+- 分词率（%）越低越好
 
 Gemma3 分词器（tokenizer）在多种语言上实现了较低的“生成密度”（fertility）和分词率，尤其在英语、法语和西班牙语上表现突出，这可以归因于其分词器训练数据以及高达 262k 的超大词表规模，约为 Llama3 128k 的两倍。Qwen3 分词器在中文上表现优异，但在英语、法语和西班牙语上落后于 Llama3 的分词器。Mistral Small 的分词器（[Mistral AI, 2025](https://mistral.ai/news/mistral-small-3-1)）在阿拉伯语上表现最佳，但在英语和中文上不及其他分词器。
 
@@ -1395,19 +1367,19 @@ SmolLM 系列致力于突破小模型的能力边界。SmolLM2 推出了 135M、
 
 以下是我们最终敲定训练方案前所做的测试：
 
-分词器（Tokenizer）： 在深入架构修改之前，我们需要选择一个分词器。我们找到了一组覆盖目标语言和领域的优秀分词器。基于我们的生成密度（fertility）分析，Llama3.2 的分词器在 6 种目标语言之间提供了最佳权衡，同时将词汇表保持在 128k——足够大以实现多语言效率，但又不会大到让嵌入权重膨胀我们的 3B 参数量。
+- 分词器（Tokenizer）： 在深入架构修改之前，我们需要选择一个分词器。我们找到了一组覆盖目标语言和领域的优秀分词器。基于我们的生成密度（fertility）分析，Llama3.2 的分词器在 6 种目标语言之间提供了最佳权衡，同时将词汇表保持在 128k——足够大以实现多语言效率，但又不会大到让嵌入权重膨胀我们的 3B 参数量。
 
-分组查询注意力（Grouped Query Attention, GQA）： 我们再次证实了此前的发现：在 3B 规模、100B token 的条件下，4 组 GQA 的性能与多头注意力（Multi-Head Attention）相当。KV 缓存的效率提升实在无法忽视，尤其是在内存宝贵的设备端部署场景。
+- 分组查询注意力（Grouped Query Attention, GQA）： 我们再次证实了此前的发现：在 3B 规模、100B token 的条件下，4 组 GQA 的性能与多头注意力（Multi-Head Attention）相当。KV 缓存的效率提升实在无法忽视，尤其是在内存宝贵的设备端部署场景。
 
-用于长上下文的 NoPE： 我们通过在每第 4 层移除 RoPE 实现了 NoPE。我们的 3B 消融实验证实了上一节的发现：NoPE 在提升长上下文处理能力的同时，没有牺牲短上下文性能。
+- 用于长上下文的 NoPE： 我们通过在每第 4 层移除 RoPE 实现了 NoPE。我们的 3B 消融实验证实了上一节的发现：NoPE 在提升长上下文处理能力的同时，没有牺牲短上下文性能。
 
-文档内注意力掩码（Intra-document attention masking）： 训练时我们阻止跨文档注意力，以在超长序列训练时提升训练速度与稳定性；再次发现这不会影响下游性能。
+- 文档内注意力掩码（Intra-document attention masking）： 训练时我们阻止跨文档注意力，以在超长序列训练时提升训练速度与稳定性；再次发现这不会影响下游性能。
 
-模型布局优化（Model layout optimization）： 我们比较了文献中近期 3B 模型的布局，有的优先深度，有的优先宽度。我们在自己的训练设置上测试了 Qwen2.5-3B（3.1B）、Llama3.2-3B（3.2B）和 Falcon3-H1-3B（3.1B）的布局，其中深度和宽度各不相同。结果很有趣：尽管 Qwen2.5-3B 的实际参数量更少，所有布局在损失和下游性能上几乎一致。但 Qwen2.5-3B 更深的架构与研究显示“网络深度有益于泛化”（[Petty et al., 2024](https://arxiv.org/abs/2310.19956)）相符。因此，我们选择了更深的布局，押注它在训练推进过程中会带来帮助。
+- 模型布局优化（Model layout optimization）： 我们比较了文献中近期 3B 模型的布局，有的优先深度，有的优先宽度。我们在自己的训练设置上测试了 Qwen2.5-3B（3.1B）、Llama3.2-3B（3.2B）和 Falcon3-H1-3B（3.1B）的布局，其中深度和宽度各不相同。结果很有趣：尽管 Qwen2.5-3B 的实际参数量更少，所有布局在损失和下游性能上几乎一致。但 Qwen2.5-3B 更深的架构与研究显示“网络深度有益于泛化”（[Petty et al., 2024](https://arxiv.org/abs/2310.19956)）相符。因此，我们选择了更深的布局，押注它在训练推进过程中会带来帮助。
 
-文档内注意力掩码（Intra-document attention masking）： 训练时我们阻止跨文档注意力，以在超长序列训练时提升训练速度与稳定性；再次发现这不会影响下游性能。
+- 文档内注意力掩码（Intra-document attention masking）： 训练时我们阻止跨文档注意力，以在超长序列训练时提升训练速度与稳定性；再次发现这不会影响下游性能。
 
-稳定性改进：我们保留了 SmolLM2 的 tied embeddings（共享嵌入），但借鉴 OLMo2 的做法增加了一个新技巧——对 embeddings（嵌入）不再施加 weight decay（权重衰减）。我们的消融实验表明，这样做既不会损害性能，又能降低嵌入的范数，有助于防止训练发散。
+- 稳定性改进：我们保留了 SmolLM2 的 tied embeddings（共享嵌入），但借鉴 OLMo2 的做法增加了一个新技巧——对 embeddings（嵌入）不再施加 weight decay（权重衰减）。我们的消融实验表明，这样做既不会损害性能，又能降低嵌入的范数，有助于防止训练发散。
 
 这种系统性消融实验的美妙之处在于，我们可以放心地将所有这些改动组合在一起，因为每一项都经过了验证。
 
@@ -1464,8 +1436,6 @@ AdamW
 
 Adam（Adaptive Momentum Estimation，自适应动量估计）是一种一阶（first order）优化技术。这意味着除了查看梯度本身，我们还会考虑权重在前几步中的变化量。这使得每个参数的学习率能够根据动量（momentum）自适应调整。
 
-细心的读者可能会问：嘿，你是不是漏掉了一个 W？确实如此！我们特意加上 W（=weight decay，权重衰减）的原因如下。在标准 SGD 中，我们只需在损失函数里加上 $ \lambda \theta^2 $（其中 $ \theta $ 为权重）即可应用 L2 正则化。然而，如果在 Adam 中同样这么做，自适应学习率也会影响到 L2 正则化。这意味着正则化强度会变得依赖于梯度大小，从而削弱其效果。这不是我们想要的，因此 AdamW 将其与主优化循环解耦（decoupled）以解决这一问题。
-
 细心的读者可能会问：嘿，你是不是漏掉了一个 W？确实如此！我们特意加上 W（=weight decay，权重衰减）的原因如下。在标准 SGD 中，我们只需在损失函数里加上 $\lambda \theta^2$（其中 $\theta$ 为权重）即可应用 L2 正则化。然而，如果在 Adam 中同样这么做，自适应学习率也会影响到 L2 正则化。这意味着正则化强度会变得依赖于梯度大小，从而削弱其效果。这不是我们想要的，因此 AdamW 将其与主优化循环解耦（decoupled）以解决这一问题。
 
 有趣的是，在过去几年里，AdamW 的超参数几乎纹丝不动：
@@ -1480,14 +1450,12 @@ Muon 一句话总结
 
 Adam 是一阶方法，因为它只使用梯度。Muon 是一个二阶优化器，它对参数张量的矩阵视图进行操作。
 
-```latex
-\begin{aligned}
+$$
 G_t &= \nabla_{\theta}\mathcal{L}_t(\theta_{t-1}) \\
 B_t &= \mu\, B_{t-1} + G_t \\
 O_t &= \mathrm{NewtonSchulz5}(B_t) \ \approx\ U V^\top \quad \text{if } B_t = U\Sigma V^\top \text{ (SVD)} \\
 \theta_t &= \theta_{t-1} - \eta\, O_t
-\end{aligned}
-```
+$$
 
 看到这些公式，你可能会疑惑：这为什么是二阶方法？我只看到了梯度，没看到更高阶项。实际上，二阶优化发生在 Newton-Schulz 步骤内部，但这里不再深入展开。已经有高质量的博客深入解释了 Muon，因此这里只列出 Muon 的三个核心思想：
 
@@ -1895,12 +1863,12 @@ Checkpoint 与自动恢复系统： 确认 checkpoint 能正确保存，且训�
 
 为验证这一点，我们保持其余配置完全一致，仅把训练步数从 32 k 调到 3.2 M。所用配置见[此处](https://huggingface.co/datasets/HuggingFaceTB/ablations-training-configs/tree/main/throughput_debugging)：
 
-## 短跑 (32k steps)
+短期 (32k steps)
 - "lr_decay_starting_step": 2560000
 - "lr_decay_steps": 640000
 - "train_steps": 3200000
 
-## 长周期运行（3.2 M steps）
+长周期运行（3.2 M steps）
 + "lr_decay_starting_step": 26000
 + "lr_decay_steps": 6000
 + "train_steps": 32000
@@ -2048,13 +2016,16 @@ index 1234567..abcdefg 100644
 
 下图展示了我们3个训练阶段以及在训练过程中 web/code/math 比例的演变。每个阶段的 SmolLM3 训练配置可在[此处](https://github.com/huggingface/smollm/tree/main/text/pretraining/smollm3)获取，包含精确的数据权重。有关每个阶段背后的原理和构成的更多详细信息，请参阅数据整理部分。
 
-阶段1：基础训练（8T tokens，4k 上下文）  
+阶段1：基础训练（8T tokens，4k 上下文） 
+
 基础阶段使用我们的核心预训练混合数据：web 数据（FineWeb-Edu、DCLM、FineWeb2、FineWeb2-HQ）、来自 The Stack v2 和 StarCoder2 的代码（code），以及来自 FineMath3+ 和 InfiWebMath3+ 的数学（math）数据。所有训练均在 4k 上下文长度下进行。
 
-阶段2：高质量注入（2T tokens，4k 上下文）  
+阶段2：高质量注入（2T tokens，4k 上下文） 
+
 我们引入更高质量过滤后的数据集：用于代码的 Stack-Edu、用于数学的 FineMath4+ 和 InfiWebMath4+，以及用于高级数学推理的 MegaMath（我们添加了 Qwen Q&A 数据、合成重写以及文本-代码交错块）。
 
-阶段3：带推理与 Q&A 数据的学习率衰减（1.1T tokens，4k 上下文）  
+阶段3：带推理与 Q&A 数据的学习率衰减（1.1T tokens，4k 上下文） 
+
 在学习率衰减阶段，我们进一步上采样高质量的代码和数学数据集，同时引入指令和推理数据，如 OpenMathReasoning、OpenCodeReasoning 和 OpenMathInstruct。Q&A 样本仅通过换行符拼接并分隔。
 
 #### [长上下文扩展：从 4k 到 128k tokens](https://huggingfacetb-smol-training-playbook.hf.space/#long-context-extension-from-4k-to-128k-tokens)
@@ -2076,6 +2047,7 @@ index 1234567..abcdefg 100644
 RoPE ABF（RoPE with Adjusted Base Frequency，带调整基频的 RoPE）： 当上下文从 4k 扩展到 32k 时，我们将 RoPE theta（基频）提高到 2M；再从 32k 扩展到 64k 时，将其提高到 5M。我们发现，使用更大的值（如 10M）会略微提升 RULER 分数，但会损害 GSM8k 等短上下文任务，因此我们保留了不影响短上下文的 5M。在此上下文扩展阶段，我们还借机进一步上采样了数学、代码和推理问答数据，并以 ChatML 格式新增了数十万个样本。
 
 YARN 外推：直达 128k  
+
 即便已在 64k 上下文上完成训练，我们仍希望 SmolLM3 在推理时能处理 128k。与其在 128k 序列上继续训练（成本过高），我们采用了 YARN（Yet Another RoPE extensioN method，又一种 RoPE 扩展方法）（[B. Peng et al., 2023](https://arxiv.org/abs/2309.00071)），它允许模型在训练长度之外进行外推。理论上，YARN 可将序列长度提升四倍。我们发现，使用 64k 检查点在 128k 上的表现优于 32k 检查点，这证实了“训练长度越接近目标推理长度，效果越好”。然而，当继续外推到 256k（从 64k 再翻四倍）时，Ruler 指标出现下降，因此我们建议将模型使用上限控制在 128k。
 
 至此，我们已完整回顾了 SmolLM3 的预训练之旅——从规划与消融实验，到最终训练运行，以及一路上的幕后挑战。
@@ -2174,7 +2146,7 @@ YARN 外推：直达 128k
 
 *   多语言（Multilinguality）。遗憾的是，测试模型多语言能力的选项并不多。我们目前依赖 Global MMLU（Singh et al., 2025）来覆盖我们模型应表现良好的主要语言，并辅以 MGSM（Shi et al., 2022）作为多语言数学能力的测试。
 
-1.   综合任务评测（Integrated task evals）
+2. 综合任务评测（Integrated task evals）
 
 这些评测测试的内容与我们即将发布的功能非常接近：多轮推理（multi-turn reasoning）、长上下文（long-context）使用，以及半真实场景下的工具调用（tool calls）。
 
@@ -2184,17 +2156,17 @@ YARN 外推：直达 128k
 *   对齐（Alignment）。衡量模型与用户意图的对齐程度通常依赖人工标注者或公共排行榜（如 [LMArena](https://lmarena.ai/)）。这是因为自由形式生成、风格或整体有用性等品质难以用自动化指标量化。然而，在所有情况下，运行这些评估都非常昂贵，因此社区转而使用大语言模型（LLM）作为人类偏好的代理。此类最受欢迎的基准包括 AlpacaEval（[Dubois et al., 2025](https://arxiv.org/abs/2404.04475)）、ArenaHard（[T. Li et al., 2024](https://arxiv.org/abs/2406.11939)）和 MixEval（[Ni et al., 2024](https://arxiv.org/abs/2406.06565)），其中后者与 LMArena 上的人类 Elo 评分相关性最强。
 *   工具调用（Tool calling）。[BFCL](https://gorilla.cs.berkeley.edu/leaderboard.html) 提供了全面的工具调用测试，尽管它往往很快就被“刷饱和”。TAU-Bench（[Barres et al., 2025](https://arxiv.org/abs/2506.07982)）则测试模型在模拟客服场景中使用工具并解决用户问题的能力，也已成为常被引用的热门基准。
 
-1.   防过拟合评估（Overfitting-prevention evals）
+3. 防过拟合评估（Overfitting-prevention evals）
 
 为了测试模型是否对某项特定技能过拟合，我们在评估集中加入了一些鲁棒性或适应性评估，例如 GSMPlus（[Q. Li 等，2024](https://arxiv.org/abs/2402.19255)），它通过对 GSM8k（[Cobbe 等，2021](https://arxiv.org/abs/2110.14168)）中的题目进行扰动，来检验模型是否仍能解决难度相当的问题。
 
-1. 内部评估（Internal evals）
+4. 内部评估（Internal evals）
 
 尽管公开基准（public benchmarks）在模型开发过程中能提供一定参考，但它们无法替代针对特定能力自行实现的内部评估，也无法替代让内部专家直接与模型交互。
 
 例如，针对 SmolLM3，我们需要一个基准来评估模型是否具备多轮推理（multi-turn reasoning）能力，于是我们实现了一个 Multi-IF 的变体来衡量这一点。
 
-1. 氛围评估与竞技场（Vibe evaluations and arenas）
+5. 氛围评估与竞技场（Vibe evaluations and arenas）
 
 同样，我们发现对中间检查点进行“氛围测试”（vibe testing，即与模型交互）对于发现评估分数无法捕捉的模型行为中的细微怪癖至关重要。正如我们稍后讨论的，氛围测试曾发现数据处理代码中的一个 bug：所有系统消息（system messages）都从语料中被删除了！这也可以在大规模上进行，以衡量人类偏好，例如流行的 [LMArena](https://lmarena.ai/)。然而，众包人类评估往往不够稳定（倾向于讨好和华丽辞藻而非实际有用性），因此应将其视为低信号反馈。
 
@@ -2994,17 +2966,7 @@ Smollm3 在 AIME25 上使用 RLVR 的下游性能。
 
 在开源生态中，GRPO 和 REINFORCE 等强化学习方法最为常用，不过 Qwen3 技术报告（[A. Yang, Li, et al., 2025](https://arxiv.org/abs/2505.09388)）强调了使用 on-policy distillation（同策略蒸馏）来训练 32B 以下参数的模型：
 
-```mermaid
-flowchart LR
-    subgraph Flagship ["旗舰模型"]
-        Base1["Base Models"] --> Stage1["Stage 1:
 
-Long-CoT Cold Start"]
-        Stage1 --> Stage2["Stage 2:
-
-Reasoning RL"]
-        Stage2 --> Stage3["Stage 3:
-```
 
 ```mermaid
 graph TD
@@ -3138,9 +3100,6 @@ _表格显示不同精度与 GPU 代际下的理论 TFLOPs（TeraFLOPs，万亿�
 吞吐量的显著提升并不仅仅是“跑得快”，它反映了我们看待数值计算方式的根本转变。FP8（8 位浮点）和 FP4（4 位浮点）让模型在每 瓦特（watt） 、每 秒（second） 内完成更多运算，因而成为大规模训练与推理的关键。H100 在 FP8 下达到 3960 TFLOPs，比 FP16/BF16 提升 4 倍；而 B200 在 FP4 下冲到 10,000 TFLOPs，更进一步刷新上限。
 
 理解这些数字：这些理论峰值 FLOPs 代表在理想条件下所能实现的_最大计算吞吐量_，即所有计算单元满载且数据随时就绪。实际性能则高度取决于你的工作负载能否持续“喂饱”计算单元，以及你的运算能否高效映射到可用硬件。
-
-<!-- 
-For SmolLM3, we were going to train on NVIDIA H100 80GB HBM3 GPUs, so we first wanted to test the H100’s theoretical TFLOPs specifications against real world performance. For this, we used the [SemiAnalysis GEMM benchmark](https://www.ray.so/#theme=prisma&darkMode=false&code=IyBBTUQgVklQIGltYWdlCmFsaWFzIGRydW49InN1ZG8gZG9ja2VyIHJ1biAtLXByaXZpbGVnZWQgLS1uZXR3b3JrPWhvc3QgLS1kZXZpY2U9L2Rldi9rZmQgLS1kZXZpY2U9L2Rldi9kcmkgLS1ncm91cC1hZGQgdmlkZW8gLS1jYXAtYWRkPVNZU19QVFJBQ0UgLS1zZWN1cml0eS1vcHQgc2VjY29tcD11bmNvbmZpbmVkIC0taXBjPWhvc3QgLS1zaG0tc2l6ZT0xOTI2IC0tcm0gLWl0IgpkcnVuIHNlbWlhbmFseXNpc3dvcmsvYW1kLW1hdG11bDpsYXRlc3QKRElTQUJMRV9BREROX0hJUF9MVD0wIFBZVE9SQ0hfVFVOQUJMRV9PUF9FTkFCTEVEPTEgcHl0aG9uIG1hdG11bC5weQoKI0FNRCBweXBpIG5pZ2h0bHkKZHJ1biBhbWQtbGF0ZXN0LXB5cGktbmlnaHRseS1tYXRtdWwKUFlUT1JDSF9UVU5BQkxFX09QX0VOQUJMRUQ9MSBweXRob24gbWF0bXVsLnB5CgojIEFNRCBweXBpIHN0YWJsZSBQeVRvcmNoIDIuNS4xCmRydW4gc2VtaWFuYWx5c2lzd29yay9hbWQtbGF0ZXN0LXB5cGktc3RhYmxlLW1hdG11bApQWVRPUkNIX1RVTkFCTEVfT1BfRU5BQkxFRD0xIHB5dGhvbiBtYXRtdWwucHkKCiMgTnZpZGlhIHN0YWJsZSAyNC4wOQphbGlhcyBkcnVuPSJkb2NrZXIgcnVuIC0tcm0gLWl0IC0tZ3B1cyBhbGwgLS1pcGM9aG9zdCAtLW5ldD1ob3N0IC0tc2htLXNpemU9MTkyNiIKZHJ1biBzZW1pYW5hbHlzaXN3b3JrL252aWRpYS1tYXRtdWw6bGF0ZXN0CnB5dGhvbiBtYXRtdWwucHkKCg&language=shell): it [tests throughput on real-world matrix multiplication shapes from Meta’s Llama 70B training](https://newsletter.semianalysis.com/p/mi300x-vs-h100-vs-h200-benchmark-part-1-training#general-matrix-multiply-gemm-performance). -->
 
 对于 SmolLM3，我们打算在 NVIDIA H100 80 GB HBM3 GPU 上进行训练，因此首先想验证 H100 的理论 TFLOPs 指标与真实世界性能是否一致。为此，我们使用了 [SemiAnalysis 的 GEMM 基准测试](https://www.ray.so/#theme=prisma&darkMode=false&code=IyBBTUQgVklQIGltYWdlCmFsaWFzIGRydW49InN1ZG8gZG9ja2VyIHJ1biAtLXByaXZpbGVnZWQgLS1uZXR3b3JrPWhvc3QgLS1kZXZpY2U9L2Rldi9rZmQgLS1kZXZpY2U9L2Rldi9kcmkgLS1ncm91cC1hZGQgdmlkZW8gLS1jYXAtYWRkPVNZU19QVFJBQ0UgLS1zZWN1cml0eS1vcHQgc2VjY29tcD11bmNvbmZpbmVkIC0taXBjPWhvc3QgLS1zaG0tc2l6ZT0xOTI2IC0tcm0gLWl0IgpkcnVuIHNlbWlhbmFseXNpc3dvcmsvYW1kLW1hdG11bDpsYXRlc3QKRElTQUJMRV9BREROX0hJUF9MVD0wIFBZVE9SQ0hfVFVOQUJMRV9PUF9FTkFCTEVEPTEgcHl0aG9uIG1hdG11bC5weQoKIyBBTUQgcHlwaSBuaWdodGx5CmRydW4gYW1kLWxhdGVzdC1weXBpLW5pZ2h0bHktbWF0bXVsClBZVE9SQ0hfVFVOQUJMRV9PUF9FTkFCTEVEPTEgcHl0aG9uIG1hdG11bC5weQoKIyBBTUQgcHlwaSBzdGFibGUgUHlUb3JjaCAyLjUuMQpkcnVuIHNlbWlhbmFseXNpc3dvcmsvYW1kLWxhdGVzdC1weXBpLXN0YWJsZS1tYXRtdWwKUFlUT1JDSF9UVU5BQkxFX09QX0VOQUJMRUQ9MSBweXRob24gbWF0bXVsLnB5CgojIE52aWRpYSBzdGFibGUgMjQuMDkKYWxpYXMgZHJ1bj0iZG9ja2VyIHJ1biAtLXJtIC1pdCAtLWdwdXMgYWxsIC0taXBjPWhvc3QgLS1uZXQ9aG9zdCAtLXNobS1zaXplPTE5MjYiCmRydW4gc2VtaWFuYWx5c2lzd29yay9udmlkaWEtbWF0bXVsOmxhdGVzdApweXRob24gbWF0bXVsLnB5Cgo&language=shell)：该基准使用 Meta Llama 70B 训练中的真实矩阵乘法形状来测试吞吐。
 
@@ -3330,7 +3289,7 @@ DGX H100。来源：NVIDIA
 
 每条链路的带宽和延迟（latency）特性各不相同，理解它们有助于定位训练管线中的瓶颈。为方便理解，我们绘制了一张简化示意图，突出最重要的组件与通信链路：
 
-带宽上限  
+带宽上限 
 CPU → GPU  
 -  
 GB/s
@@ -3495,22 +3454,19 @@ GPUDirect RDMA（Remote Direct Memory Access，远程直接内存访问，简称
 
 ```
 $ lstopo -v
-...
 
 ## 我们可以在每个 PCIe 交换机上看到 4 个这样的 EFA 设备
 PCIBridge L#8 (busid=0000:46:01.0 id=1d0f:0200 class=0604(PCIBridge) link=15.75GB/s buses=0000:[4f-4f] PCIVendor="Amazon.com, Inc.")
 PCI L#6 (busid=0000:4f:00.0 id=1d0f:efa1 class=0200(Ethernet) link=15.75GB/s PCISlot=82-1 PCIVendor="Amazon.com, Inc.")
     OpenFabrics L#4 (NodeGUID=cd77:f833:0000:1001 SysImageGUID=0000:0000:0000:0000 Port1State=4 Port1LID=0x0 Port1LMC=1 Port1GID0=fe80:0000:0000:0000:14b0:33ff:fef8:77cd) "rdmap79s0"
-...
 
-```
 fi_info --verbose
-        fi_link_attr:
-            address: EFA-fe80::14b0:33ff:fef8:77cd
-            mtu: 8760            # 最大数据包大小为 8760 字节
-            speed: 100000000000  # 每个 EFA 链路提供 100 Gbps 带宽
-            state: FI_LINK_UP
-            network_type: Ethernet
+fi_link_attr:
+    address: EFA-fe80::14b0:33ff:fef8:77cd
+    mtu: 8760            # 最大数据包大小为 8760 字节
+    speed: 100000000000  # 每个 EFA 链路提供 100 Gbps 带宽
+    state: FI_LINK_UP
+    network_type: Ethernet
 ```
 
 每个 EFA 链路（EFA link） 提供 100 Gbps（12.5 GB/s）带宽。每个 GPU 配备 4 个 EFA 网卡（EFA NICs），每节点 8 块 GPU，因此每节点总带宽为 $100 \times 4 \times 8 = 3200$ Gbps（400 GB/s）。
@@ -3689,8 +3645,6 @@ CPU 亲和性配置
 网络拓扑与放置
 
 理解网络拓扑对诊断性能问题至关重要。云放置组（placement group）虽有帮助，但无法保证实例间网络跳数最少。在现代数据中心的 fat-tree（胖树）拓扑中，位于不同顶层交换机下的实例会因路由路径中的额外网络跳数而遭遇更高延迟，并可能降低带宽。
-
-<!-- For AWS EC2 users, the [Instance Topology API](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/how-ec2-instance-topology-works.html) provides valuable visibility into network node placement. Instances sharing t”he same network node at the bottom layer (directly connected to the instance) are physically closest and will achieve the lowest latency communication. -->
 
 对于 AWS EC2 用户，[Instance Topology API](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/how-ec2-instance-topology-works.html) 提供了对网络节点放置的清晰视图。共享底层（与实例直接相连）同一网络节点的实例在物理上最接近，彼此通信的延迟也最低。
 
@@ -4116,6 +4070,7 @@ Successfully ran diagnostic for group.
 | Info | GPU 7 Allocated 83892938283 bytes (98.4%) |
 
 +-----  Stress  ------------+------------------------------------------------+
+```
 
 节点预留（Node reservation）： 由于 SmolLM3 是在由 Slurm 管理的集群上训练的，我们为整个训练过程预订了固定的 48 个节点。这种设置让我们能够持续追踪同一批节点的健康与性能，也解决了前文提到的数据存储问题。我们还预留了一个备用节点（就像汽车的备胎），一旦某个节点故障，可立即替换，无需等待维修。空闲时，该备用节点会运行评估任务或开发实验。
 
@@ -4223,7 +4178,8 @@ $$\text{GPU Count} = \frac{1.98 \times 10^{23} \text{ FLOPs}}{216 \times 10^{12}
 
 阿姆达尔定律指出，并行化带来的加速从根本上受限于工作负载中串行（不可并行）部分的比例。在 LLM 训练中，这部分“串行”主要是通信开销：在 GPU 之间同步梯度/权重/激活所花费的时间，这部分无法通过并行化消除（更多阅读见[此处](https://acenet-arc.github.io/ACENET_Summer_School_General/05-performance/index.html)）。
 
-公式为：  
+公式为： 
+
 $$\text{最大加速比} = \frac{1}{\text{串行比例} + \frac{\text{并行比例}}{\text{处理器数量}}}$$
 
 对于 SmolLM3 的 3B 模型，如果通信占用每一步 10 % 的时间，那么无论你增加多少 GPU，都无法获得超过 10 倍的加速。更糟的是，随着 GPU 数量增加，通信占比往往还会上升，因为：

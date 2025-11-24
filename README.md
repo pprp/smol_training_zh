@@ -1205,15 +1205,15 @@ BPE（Byte-Pair Encoding，字节对编码）（[Sennrich et al., 2016](https://
 
 为了评估分词器的表现，我们可以采用 FineWeb2（[Penedo et al., 2025](https://arxiv.org/abs/2506.20920)）中使用的两项关键指标。
 
-Fertility（生育度）：
+Fertility（生成密度）：
 
-它衡量编码一个单词所需的平均 token 数。生育度越低，压缩率越高，训练与推理速度也越快。可以这样理解：如果某个分词器对大多数单词需要多一两个 token，而另一个分词器用更少的 token 就能完成，那么后者显然更高效。
+它衡量编码一个单词所需的平均 token 数。生成密度越低，压缩率越高，训练与推理速度也越快。可以这样理解：如果某个分词器对大多数单词需要多一两个 token，而另一个分词器用更少的 token 就能完成，那么后者显然更高效。
 
-衡量 fertility（生育率）的标准做法是计算 words-to-tokens ratio（词-词元比，即 word fertility），它衡量平均每个词需要多少个词元。该指标围绕“词”这一概念定义，因为在具备合适分词器（word tokenizer）的情况下，它能在跨语言比较中提供有意义的结果，例如在 [Spacy](https://spacy.io/) 和 [Stanza](https://stanfordnlp.github.io/stanza) 中（[Penedo et al., 2025](https://arxiv.org/abs/2506.20920)）。
+衡量 fertility（生成密度）的标准做法是计算 words-to-tokens ratio（词-词元比，即 word fertility），它衡量平均每个词需要多少个词元。该指标围绕“词”这一概念定义，因为在具备合适分词器（word tokenizer）的情况下，它能在跨语言比较中提供有意义的结果，例如在 [Spacy](https://spacy.io/) 和 [Stanza](https://stanfordnlp.github.io/stanza) 中（[Penedo et al., 2025](https://arxiv.org/abs/2506.20920)）。
 
 在单一语言内比较不同 tokenizer（分词器）时，也可以用字符数或字节数代替词数，得到 characters-to-tokens ratio（字符-词元比）或 bytes-to-tokens ratio（字节-词元比）（[Dagan et al., 2024](https://arxiv.org/abs/2402.01035)）。然而，这些指标在跨语言比较中存在局限：字节数可能因不同文字的字节表示不同而失真（例如，汉字在 UTF-8 中占 3 字节，而拉丁字母占 1–2 字节）；同样，仅用字符数无法反映不同语言单词长度差异巨大——例如，中文词通常比德语复合词短得多。
 
-Proportion of continued words（续词比例）：
+Proportion of continued words（分词率）：
 
 该指标告诉我们有多少比例的词被切分成多段。比例越低越好，意味着更少词被碎片化，从而使分词更高效。
 
@@ -1243,9 +1243,9 @@ def compute_tokenizer_metrics(tokenizer, word_tokenizer, text):
     return fertility, proportion_continued_words
 ```
 
-对于代码和数学等专业领域，除了生育率（fertility）之外，我们还需要更深入地研究分词器（tokenizer）处理领域特定模式的能力。大多数现代分词器会对单个数字进行拆分（例如将“123”拆分为[“1”, “2”, “3”]）（[Chowdhery et al., 2022](https://arxiv.org/abs/2204.02311)；[DeepSeek-AI et al., 2024](https://arxiv.org/abs/2405.04434)）。将数字拆分开来可能看起来有违直觉，但实际上这有助于模型更有效地学习算术模式。如果“342792”被编码为一个不可分割的token（词元），那么模型必须记住该特定token与其他所有数字token相加、相减或相乘的结果。但当它被拆分时，模型就能学习数字级别的运算规律。一些分词器（如Llama3，[Grattafiori et al., 2024](https://arxiv.org/abs/2407.21783)）会将1到999的数字编码为唯一token，其余数字则由这些token组合而成。
+对于代码和数学等专业领域，除了生成密度（fertility）之外，我们还需要更深入地研究分词器（tokenizer）处理领域特定模式的能力。大多数现代分词器会对单个数字进行拆分（例如将“123”拆分为[“1”, “2”, “3”]）（[Chowdhery et al., 2022](https://arxiv.org/abs/2204.02311)；[DeepSeek-AI et al., 2024](https://arxiv.org/abs/2405.04434)）。将数字拆分开来可能看起来有违直觉，但实际上这有助于模型更有效地学习算术模式。如果“342792”被编码为一个不可分割的token（词元），那么模型必须记住该特定token与其他所有数字token相加、相减或相乘的结果。但当它被拆分时，模型就能学习数字级别的运算规律。一些分词器（如Llama3，[Grattafiori et al., 2024](https://arxiv.org/abs/2407.21783)）会将1到999的数字编码为唯一token，其余数字则由这些token组合而成。
 
-因此，我们可以通过测量目标领域的生育率（fertility）来评估分词器的优缺点。下表比较了不同流行分词器在多种语言和领域中的生育率。
+因此，我们可以通过测量目标领域的生成密度（fertility）来评估分词器的优缺点。下表比较了不同流行分词器在多种语言和领域中的生成密度。
 
 评估分词器（Evaluating tokenizers）
 
@@ -1352,15 +1352,15 @@ tokenizer    language  fertility       pcw
 
 结果显示，根据你的优先级，存在一些优胜者和权衡取舍：
 
-##### 生育力（tokens per word）
+##### 生成密度（tokens per word）
 
 越低越好
 
-##### 续词比例（%）
+##### 分词率（%）
 
 越低越好
 
-Gemma3 分词器（tokenizer）在多种语言上实现了较低的“生育率”（fertility）和分词率，尤其在英语、法语和西班牙语上表现突出，这可以归因于其分词器训练数据以及高达 262k 的超大词表规模，约为 Llama3 128k 的两倍。Qwen3 分词器在中文上表现优异，但在英语、法语和西班牙语上落后于 Llama3 的分词器。Mistral Small 的分词器（[Mistral AI, 2025](https://mistral.ai/news/mistral-small-3-1)）在阿拉伯语上表现最佳，但在英语和中文上不及其他分词器。
+Gemma3 分词器（tokenizer）在多种语言上实现了较低的“生成密度”（fertility）和分词率，尤其在英语、法语和西班牙语上表现突出，这可以归因于其分词器训练数据以及高达 262k 的超大词表规模，约为 Llama3 128k 的两倍。Qwen3 分词器在中文上表现优异，但在英语、法语和西班牙语上落后于 Llama3 的分词器。Mistral Small 的分词器（[Mistral AI, 2025](https://mistral.ai/news/mistral-small-3-1)）在阿拉伯语上表现最佳，但在英语和中文上不及其他分词器。
 
 在现有分词器与自定义分词器之间做选择
 
@@ -1383,7 +1383,7 @@ SmolLM 系列致力于突破小模型的能力边界。SmolLM2 推出了 135M、
 
 以下是我们最终敲定训练方案前所做的测试：
 
-分词器（Tokenizer）： 在深入架构修改之前，我们需要选择一个分词器。我们找到了一组覆盖目标语言和领域的优秀分词器。基于我们的生育率（fertility）分析，Llama3.2 的分词器在 6 种目标语言之间提供了最佳权衡，同时将词汇表保持在 128k——足够大以实现多语言效率，但又不会大到让嵌入权重膨胀我们的 3B 参数量。
+分词器（Tokenizer）： 在深入架构修改之前，我们需要选择一个分词器。我们找到了一组覆盖目标语言和领域的优秀分词器。基于我们的生成密度（fertility）分析，Llama3.2 的分词器在 6 种目标语言之间提供了最佳权衡，同时将词汇表保持在 128k——足够大以实现多语言效率，但又不会大到让嵌入权重膨胀我们的 3B 参数量。
 
 分组查询注意力（Grouped Query Attention, GQA）： 我们再次证实了此前的发现：在 3B 规模、100B token 的条件下，4 组 GQA 的性能与多头注意力（Multi-Head Attention）相当。KV 缓存的效率提升实在无法忽视，尤其是在内存宝贵的设备端部署场景。
 
@@ -1413,7 +1413,7 @@ SmolLM 系列致力于突破小模型的能力边界。SmolLM2 推出了 135M、
 
 规模效应真实存在——尽可能在目标规模重新消融。 不要假设小规模的消融结果在目标模型规模下完全成立。如果有算力，尽量重新确认它们。
 
-在实际领域验证分词器效率。 在目标语言和领域上的 fertility（生育率）指标比追随最新模型使用的方案更重要。一个 50k 的英文分词器无法胜任严肃的多语言工作，但如果你并未覆盖那么多语言，也不需要 256k 的词表。
+在实际领域验证分词器效率。 在目标语言和领域上的 fertility（生成密度）指标比追随最新模型使用的方案更重要。一个 50k 的英文分词器无法胜任严肃的多语言工作，但如果你并未覆盖那么多语言，也不需要 256k 的词表。
 
 既然模型架构已定，接下来就该解决驱动学习过程的优化器与超参数了。
 

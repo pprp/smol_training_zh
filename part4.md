@@ -1,3 +1,5 @@
+节点预留（Node reservation）： 由于 SmolLM3 是在由 Slurm 管理的集群上训练的，我们为整个训练过程预订了固定的 48 个节点。这种设置让我们能够持续追踪同一批节点的健康与性能，也解决了前文提到的数据存储问题。我们还预留了一个备用节点（就像汽车的备胎），一旦某个节点故障，可立即替换，无需等待维修。空闲时，该备用节点会运行评估任务或开发实验。
+
 持续监控（Continuous monitoring）： 训练期间，我们实时跟踪所有节点的关键指标，包括 GPU 温度、内存用量、计算利用率与吞吐波动。我们使用 [Prometheus](https://prometheus.io/) 收集所有 GPU 的 [DCGM](https://github.com/NVIDIA/DCGM) 指标，并在 [Grafana](https://grafana.com/) 仪表板中可视化，实现实时监控。如需在 AWS 基础设施上部署 Prometheus 与 Grafana 进行 GPU 监控的详细步骤，请参考[此示例设置指南](https://github.com/aws-samples/awsome-distributed-training/tree/3ae961d022399021cc4053c3ba19b182ca6b8dc8/4.validation_and_observability/4.prometheus-grafana)。Slack 机器人会在任何节点出现异常行为时发出告警，使我们能在硬件彻底崩溃前主动更换。
 
 [访问仪表板](https://huggingfacetb-smol-training-playbook.hf.space/screencapture-grafana-huggingface.pdf) 这种多层策略让硬件问题变成了可控的中断。
@@ -102,7 +104,8 @@ $$\text{GPU Count} = \frac{1.98 \times 10^{23} \text{ FLOPs}}{216 \times 10^{12}
 
 阿姆达尔定律指出，并行化带来的加速从根本上受限于工作负载中串行（不可并行）部分的比例。在 LLM 训练中，这部分“串行”主要是通信开销：在 GPU 之间同步梯度/权重/激活所花费的时间，这部分无法通过并行化消除（更多阅读见[此处](https://acenet-arc.github.io/ACENET_Summer_School_General/05-performance/index.html)）。
 
-公式为：  
+公式为： 
+
 $$\text{最大加速比} = \frac{1}{\text{串行比例} + \frac{\text{并行比例}}{\text{处理器数量}}}$$
 
 对于 SmolLM3 的 3B 模型，如果通信占用每一步 10 % 的时间，那么无论你增加多少 GPU，都无法获得超过 10 倍的加速。更糟的是，随着 GPU 数量增加，通信占比往往还会上升，因为：
