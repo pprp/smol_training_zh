@@ -497,9 +497,15 @@ But now let’s start with the core of every LLM: the attention mechanism.
 
 One of the most active areas of research around transformer architectures is the attention mechanism. While feedforward layers dominate compute during pretraining, attention becomes the main bottleneck at inference (especially with long contexts), where it drives up compute cost and the KV cache quickly consumes GPU memory, reducing throughput. Let’s take a quick tour around the main attention mechanisms and how they trade-off capacity and speed.
 #### How many heads for my attention?
-_Multi-head attention (MHA)_ is the standard attention introduced with the original transformer ([Vaswani et al., 2023](https://arxiv.org/abs/1706.03762)). The main idea is that you have N attention heads each independently doing the same retrieval task: transform the hidden state into queries, keys, and values, then use the current query to retrieve the most relevant token by match on the keys and finally forward the value associated with the matched tokens. At inference time we don’t need to recompute the KV values for past tokens and can reuse them. The memory for past KV values is called the _KV-Cache_ . As context windows grow, this cache can quickly become an inference bottleneck and consume a large share of GPU memory. Here’s a simple calculation to estimate the KV-Cache memory s K V s_{KV} for the Llama 3 architecture with MHA and a sequence length of 8192:
+_Multi-head attention (MHA)_ is the standard attention introduced with the original transformer ([Vaswani et al., 2023](https://arxiv.org/abs/1706.03762)). The main idea is that you have N attention heads each independently doing the same retrieval task: transform the hidden state into queries, keys, and values, then use the current query to retrieve the most relevant token by match on the keys and finally forward the value associated with the matched tokens. At inference time we don’t need to recompute the KV values for past tokens and can reuse them. The memory for past KV values is called the _KV-Cache_ . As context windows grow, this cache can quickly become an inference bottleneck and consume a large share of GPU memory. Here’s a simple calculation to estimate the KV-Cache memory $s_{KV}$ for the Llama 3 architecture with MHA and a sequence length of 8192:
 
-s K V=2×n b y t e s×s e q×n l a y e r s×n h e a d s×d i m h e a d s=2×2×8192×32×32×128=4 GB(Llama 3 8B)=2×2×8192×80×64×128=20 GB(Llama 3 70B)\begin{equation} \begin{aligned} s_{KV} &= 2 \times n_{bytes} \times seq \times n_{layers} \times n_{heads} \times dim_{heads} \\ &= 2 \times 2 \times8192 \times 32 \times 32 \times 128 =4 \text{ GB} \textit{ (Llama 3 8B)} \\ &= 2 \times 2 \times8192 \times 80 \times 64 \times 128 =20 \text{ GB} \textit{ (Llama 3 70B)} \end{aligned} \end{equation}
+$$
+\begin{aligned}
+s_{KV} &= 2 \times n_{\text{bytes}} \times seq \times n_{\text{layers}} \times n_{\text{heads}} \times dim_{\text{heads}} \\
+&= 2 \times 2 \times 8192 \times 32 \times 32 \times 128 = 4 \text{ GB} \textit{ (Llama 3 8B)} \\
+&= 2 \times 2 \times 8192 \times 80 \times 64 \times 128 = 20 \text{ GB} \textit{ (Llama 3 70B)}
+\end{aligned}
+$$
 Note that the leading factor of 2 comes from storing both key and value caches. As you can see, the cache increases linearly with sequence length, but context windows have grown exponentially, now reaching millions of tokens. So improving the efficiency of the cache would make scaling context at inference time much easier.
 
 The natural question to ask is: do we really need new KV values for each head? Probably not and both Multi-Query Attention (MQA) ([Shazeer, 2019](https://arxiv.org/abs/1911.02150)) and Grouped Query Attention (GQA) ([Ainslie et al., 2023](https://arxiv.org/abs/2305.13245)) address this. The simplest case is to share the KV values across all heads, thus dividing the size of the KV cache by n h e a d s n_{heads} , which is e.g. a 64 decrease for Llama 3 70B! This is the idea of MQA and was used in some models like StarCoder as an alternative to MHA. However, we might give away a bit more attention capacity than we are willing to, so we could consider the middle ground and share the KV values across groups of heads e.g. 4 heads sharing the same KV values. This is the GQA approach and strikes a middle ground between MQA and MHA.
@@ -512,10 +518,10 @@ The following table compares the attention mechanisms we just discussed in this 
 
 | Attention Mechanism | KV-Cache parameters per token |
 | --- | --- |
-| MHA | =2×n h e a d s×n l a y e r s×d i m h e a d= 2 \times n_{heads} \times n_{layers} \times dim_{head} |
-| MQA | =2×1×n l a y e r s×d i m h e a d= 2 \times 1 \times n_{layers} \times dim_{head} |
-| GQA | =2×g×n l a y e r s×d i m h e a d(typically g=2,4,8)= 2 \times g \times n_{layers} \times dim_{head} \text { (typically g=2,4,8 )} |
-| MLA | =4.5×n l a y e r s×d i m h e a d= 4.5 \times n_{layers} \times dim_{head} |
+| MHA | `2 × n_heads × n_layers × dim_head` |
+| MQA | `2 × 1 × n_layers × dim_head` |
+| GQA | `2 × g × n_layers × dim_head` (typically `g = 2, 4, 8`) |
+| MLA | `4.5 × n_layers × dim_head` |
 
 Now let’s see how these attention mechanisms fare in real experiments!
 #### Ablation - GQA beats MHA
@@ -834,7 +840,13 @@ Let’s have a closer look how we can setup the sparsity of the MoE to improve t
 
 In this section we want to find out which MoE setting is best. Asymptotically it’s easy to see that the two extremes are not ideal settings. On the one hand, activating all experts all the time brings us back to the dense setting where all parameters are used all the time. On the other hand if the active parameters are very low (as an extreme think just of just 1 parameter being active) clearly it won’t be enough to solve a task even in a narrow domain. So clearly we need to find some middle ground. Before we get deeper into finding the optimal setup it is useful to define two quantities: _**activation ratio**_ and its inverse the _**sparsity**_ _:_
 
-activation ratio=#activated experts#total experts\text{activation ratio} \;=\; \frac{\#\text{activated experts}}{\#\text{total experts}}sparsity=#total experts#activated experts=1 activation ratio\text{sparsity} \;=\; \frac{\#\text{total experts}}{\#\text{activated experts}} \;=\; \frac{1}{\text{activation ratio}}
+$$
+\begin{aligned}
+\text{activation ratio} &= \frac{n_{\text{activated experts}}}{n_{\text{total experts}}} \\[6pt]
+\text{sparsity} &= \frac{n_{\text{total experts}}}{n_{\text{activated experts}}}
+= \frac{1}{\text{activation ratio}}
+\end{aligned}
+$$
 From a compute perspective the cost is driven by active parameters only. If you keep the number (and size) of activated experts fixed and increase the total number of experts, your inference/training FLOPs budget stays somewhat the same, but you’re adding model capacity so the model should be generally better as long as you train long enough.
 
 There are some interesting empirical takeaways if you survey the recent MoE papers: Holding the number and size of active experts fixed, increasing the total number of experts (i.e., lowering activation ratio / increasing sparsity) improves loss, with diminishing returns once sparsity gets very high.
@@ -916,12 +928,15 @@ Load balancing is the critical piece in MoE. If it is set up poorly, it can unde
 
 To address this issue we can we can add an extra loss term to the router. Below you can see the standard auxiliary loss–based load balancing (LBL):
 
-L Bal=α∑i=1 N r f i P i\mathcal{L}_{\text{Bal}} \;=\; \alpha \sum_{i=1}^{N_{r}} f_{i}\, P_{i}
-This simple formula just uses three factors: the coefficient α\alpha determines the strength of the loss, f i f_i is the traffic fraction so just the fraction of tokens going through expert i i and finally P i P_i which is the probability mass and simply sums the probability of the tokens going through the expert. They are both necessary, f i f_i correspond to the actual balancing, while P i P_i is smooth and differentiable allowing the gradient to flows. If we achieve perfect load balancing we get f i=P i=1/N r f_i=P_i=1/N_r , however we need to be careful how we tune α\alpha as a value too small we don’t guide routing enough and if it’s too big routing uniformity becomes more important than the primary language model loss.
+$$
+\mathcal{L}_{\text{Bal}} = \alpha \sum_{i=1}^{N_r} f_i P_i
+$$
 
-It is also possible to achieve balancing without an explicit loss term. DeepSeek v3 ([DeepSeek-AI et al., 2025](https://arxiv.org/abs/2412.19437)) introduced a simple bias term added to the affinity scores that go into the routing softmax. If a router is overloaded they decrease the score a bit (a constant factor γ\gamma ) thus making it less likely to be selected and increase it by γ\gamma if the expert is underutilized. With this simple adaptive rule they also achieve load balancing.
+This simple formula uses three factors: the coefficient $\alpha$ determines the strength of the loss, $f_i$ is the traffic fraction for expert $i$, and $P_i$ is the probability mass assigned to that expert. They are both necessary: $f_i$ captures actual balancing, while $P_i$ stays smooth and differentiable so gradients can flow. Under perfect load balancing, we would get $f_i = P_i = 1/N_r$. As usual, $\alpha$ needs careful tuning: too small and the router receives too little guidance, too large and uniform routing becomes more important than the primary language-model loss.
 
-A key detail is the scope at which you compute routing statistics: are f i f_i and P i P_i computed per local batch (each worker’s mini-batch) or globally (aggregated across workers/devices)? Qwen team’s analysis ([Qiu et al., 2025](https://arxiv.org/abs/2501.11873)) shows that when there isn’t enough token diversity in each local batch and that local computation can hurt both expert specialization (a good proxy for routing health) and overall model performance. Expert specialization is the phenomenon where one or more experts are activated more often than others for a specific domain. In other words, if a local batch is narrow, its routing stats become noisy/biased, and don’t lead to good balancing. This implies that we should use global statistics (or at least cross-device aggregation) whenever feasible. Notably, at the time of that paper, many frameworks—including Megatron—computed these statistics locally by default.
+It is also possible to achieve balancing without an explicit loss term. DeepSeek v3 ([DeepSeek-AI et al., 2025](https://arxiv.org/abs/2412.19437)) introduced a simple bias term added to the affinity scores that go into the routing softmax. If a router is overloaded they decrease the score a bit (a constant factor $\gamma$), making it less likely to be selected, and increase it by $\gamma$ if the expert is underutilized. With this simple adaptive rule they also achieve load balancing.
+
+A key detail is the scope at which you compute routing statistics: are $f_i$ and $P_i$ computed per local batch (each worker’s mini-batch) or globally (aggregated across workers/devices)? Qwen team’s analysis ([Qiu et al., 2025](https://arxiv.org/abs/2501.11873)) shows that when there isn’t enough token diversity in each local batch, local computation can hurt both expert specialization (a good proxy for routing health) and overall model performance. Expert specialization is the phenomenon where one or more experts are activated more often than others for a specific domain. In other words, if a local batch is narrow, its routing stats become noisy or biased and don’t lead to good balancing. This implies that we should use global statistics (or at least cross-device aggregation) whenever feasible. Notably, at the time of that paper, many frameworks—including Megatron—computed these statistics locally by default.
 
 The following plot from Qwen’s paper illustrates the difference of micro-batch vs global batch aggregation and it’s impact on performance and specialization:
 
@@ -1003,15 +1018,15 @@ Almost all recent linear attention methods have this gating component with just 
 
 | Model | Parameterization | Learnable parameters |
 | --- | --- | --- |
-| Mamba ([A. Gu & Dao, 2024](https://arxiv.org/abs/2312.00752)) | G t=exp⁡(−(1⊤α t)⊙exp⁡(A)),α t=softplus(x t W α 1 W α 2)\mathbf{G}_t = \exp(-(\mathbf{1}^\top \boldsymbol{\alpha}_t) \odot \exp(\mathbf{A})), \quad \boldsymbol{\alpha}t = \text{softplus}(\mathbf{x}t \mathbf{W}{\alpha_1} \mathbf{W}{\alpha_2}) | A∈R d k×d v,W α 1∈R d×d 16,W α 2∈R d 16×d v\mathbf{A} \in \mathbb{R}^{d_k \times d_v}, \quad \mathbf{W}{\alpha_1} \in \mathbb{R}^{d \times \frac{d}{16}}, \quad \mathbf{W}{\alpha_2} \in \mathbb{R}^{\frac{d}{16} \times d_v} |
-| Mamba-2 ([Dao & Gu, 2024](https://arxiv.org/abs/2405.21060)) | G t=γ t 1⊤1,γ t=exp⁡(−softplus(x t W γ)exp⁡(a))\mathbf{G}_t = \gamma_t \mathbf{1}^\top \mathbf{1}, \quad \gamma_t = \exp(-\text{softplus}(\mathbf{x}t \mathbf{W}{\gamma})\exp(a)) | W γ∈R d×1,a∈R\mathbf{W}_{\gamma} \in \mathbb{R}^{d \times 1}, \quad a \in \mathbb{R} |
-| mLSTM ([Beck et al., 2025](https://arxiv.org/abs/2503.14376); H. [Peng et al., 2021](https://arxiv.org/abs/2103.02143)) | G t=γ t 1⊤1,γ t=σ(x t W γ)\mathbf{G}_t = \gamma_t \mathbf{1}^\top \mathbf{1}, \quad \gamma_t = \sigma(\mathbf{x}t \mathbf{W}{\gamma}) | W γ∈R d×1\mathbf{W}_{\gamma} \in \mathbb{R}^{d \times 1} |
-| Gated Retention ([Sun et al., 2024](https://arxiv.org/abs/2405.05254)) | G t=γ t 1⊤1,γ t=σ(x t W γ)1 τ\mathbf{G}_t = \gamma_t \mathbf{1}^\top \mathbf{1}, \quad \gamma_t = \sigma(\mathbf{x}t \mathbf{W}{\gamma})^{\frac{1}{\tau}} | W γ∈R d×1\mathbf{W}_{\gamma} \in \mathbb{R}^{d \times 1} |
-| DFW (Mao, 2022; Pramanik et al., 2023) ([Mao, 2022](https://arxiv.org/abs/2210.04243)) | G t=α t⊤β t,α t=σ(x t W α),β t=σ(x t W β)\mathbf{G}_t = \boldsymbol{\alpha}_t^\top \boldsymbol{\beta}_t, \quad \boldsymbol{\alpha}_t = \sigma(\mathbf{x}t \mathbf{W}{\alpha}), \quad \boldsymbol{\beta}_t = \sigma(\mathbf{x}t \mathbf{W}{\beta}) | W α∈R d×d k,W β∈R d×d v\mathbf{W}{\alpha} \in \mathbb{R}^{d \times d_k}, \quad \mathbf{W}{\beta} \in \mathbb{R}^{d \times d_v} |
-| GateLoop ([Katsch, 2024](https://arxiv.org/abs/2311.01927)) | G t=α t⊤1,α t=σ(x t W α 1)exp⁡(x t W α 2 i)\mathbf{G}_t = \boldsymbol{\alpha}_t^\top \mathbf{1}, \quad \boldsymbol{\alpha}_t = \sigma(\mathbf{x}t \mathbf{W}{\alpha_1})\exp(\mathbf{x}t \mathbf{W}{\alpha_2} \mathrm{i}) | W α 1∈R d×d k,W α 2∈R d×d k\mathbf{W}{\alpha_1} \in \mathbb{R}^{d \times d_k}, \quad \mathbf{W}{\alpha_2} \in \mathbb{R}^{d \times d_k} |
-| HGRN-2 ([Qin et al., 2024](https://arxiv.org/abs/2404.07904)) | G t=α t⊤1,α t=γ+(1−γ)σ(x t W α)\mathbf{G}_t = \boldsymbol{\alpha}_t^\top \mathbf{1}, \quad \boldsymbol{\alpha}_t = \gamma + (1-\gamma)\sigma(\mathbf{x}t \mathbf{W}{\alpha}) | W α∈R d×d k,γ∈(0,1)d k\mathbf{W}_{\alpha} \in \mathbb{R}^{d \times d_k}, \quad \gamma \in (0,1)^{d_k} |
-| RWKV-6 ([B. Peng et al., 2024](https://arxiv.org/abs/2404.05892)) | G t=α t⊤1,α t=exp⁡(−exp⁡(x t W α))\mathbf{G}_t = \boldsymbol{\alpha}_t^\top \mathbf{1}, \quad \boldsymbol{\alpha}_t = \exp(-\exp(\mathbf{x}t \mathbf{W}{\alpha})) | W α∈R d×d k\mathbf{W}_{\alpha} \in \mathbb{R}^{d \times d_k} |
-| Gated Linear Attention (GLA) | G t=α t⊤1,α t=σ(x t W α 1 W α 2)1 τ\mathbf{G}_t = \boldsymbol{\alpha}_t^\top \mathbf{1}, \quad \boldsymbol{\alpha}t = \sigma(\mathbf{x}t \mathbf{W}{\alpha_1} \mathbf{W}{\alpha_2})^{\frac{1}{\tau}} | W α 1∈R d×16,W α 2∈R 16×d k\mathbf{W}{\alpha_1} \in \mathbb{R}^{d \times 16}, \quad \mathbf{W}{\alpha_2} \in \mathbb{R}^{16 \times d_k} |
+| Mamba ([A. Gu & Dao, 2024](https://arxiv.org/abs/2312.00752)) | `G_t = exp(-(1^T α_t) ⊙ exp(A)), α_t = softplus(x_t W_{α_1} W_{α_2})` | `A ∈ R^{d_k×d_v}, W_{α_1} ∈ R^{d×d/16}, W_{α_2} ∈ R^{d/16×d_v}` |
+| Mamba-2 ([Dao & Gu, 2024](https://arxiv.org/abs/2405.21060)) | `G_t = γ_t 1^T 1, γ_t = exp(-softplus(x_t W_γ) exp(a))` | `W_γ ∈ R^{d×1}, a ∈ R` |
+| mLSTM ([Beck et al., 2025](https://arxiv.org/abs/2503.14376); H. [Peng et al., 2021](https://arxiv.org/abs/2103.02143)) | `G_t = γ_t 1^T 1, γ_t = σ(x_t W_γ)` | `W_γ ∈ R^{d×1}` |
+| Gated Retention ([Sun et al., 2024](https://arxiv.org/abs/2405.05254)) | `G_t = γ_t 1^T 1, γ_t = σ(x_t W_γ)^{1/τ}` | `W_γ ∈ R^{d×1}` |
+| DFW (Mao, 2022; Pramanik et al., 2023) ([Mao, 2022](https://arxiv.org/abs/2210.04243)) | `G_t = α_t^T β_t, α_t = σ(x_t W_α), β_t = σ(x_t W_β)` | `W_α ∈ R^{d×d_k}, W_β ∈ R^{d×d_v}` |
+| GateLoop ([Katsch, 2024](https://arxiv.org/abs/2311.01927)) | `G_t = α_t^T 1, α_t = σ(x_t W_{α_1}) exp(x_t W_{α_2} i)` | `W_{α_1} ∈ R^{d×d_k}, W_{α_2} ∈ R^{d×d_k}` |
+| HGRN-2 ([Qin et al., 2024](https://arxiv.org/abs/2404.07904)) | `G_t = α_t^T 1, α_t = γ + (1-γ) σ(x_t W_α)` | `W_α ∈ R^{d×d_k}, γ ∈ (0,1)^{d_k}` |
+| RWKV-6 ([B. Peng et al., 2024](https://arxiv.org/abs/2404.05892)) | `G_t = α_t^T 1, α_t = exp(-exp(x_t W_α))` | `W_α ∈ R^{d×d_k}` |
+| Gated Linear Attention (GLA) | `G_t = α_t^T 1, α_t = σ(x_t W_{α_1} W_{α_2})^{1/τ}` | `W_{α_1} ∈ R^{d×16}, W_{α_2} ∈ R^{16×d_k}` |
 
 Gated linear attention formulation of recent models, which vary in their parameterization of $\mathbf{G}_t$ . The bias terms are omitted.
 
@@ -1328,13 +1343,20 @@ Interestingly, across the last few years the AdamW hyperparameters have barely m
 
 The same triplet is almost reused from Llama 1,2,3 to DeepSeek-V1,2,3 671B, no change. Was Durk Kingma right all along or can we do better?
 #### Muon in one line
-Adam is a first-order methods, as it is only uses the gradients. Muon is a second-order optimizer that acts on the _matrix_ view of a parameter tensor.
+Adam is a first-order method because it only uses gradients. Muon is a second-order optimizer that acts on the _matrix_ view of a parameter tensor.
 
-G t=∇θ L t(θ t−1)B t=μ B t−1+G t O t=N e w t o n S c h u l z 5(B t)≈U V⊤if B t=U Σ V⊤(SVD)θ t=θ t−1−η O t \begin{aligned} G_t &= \nabla_{\theta}\mathcal{L}_t(\theta_{t-1}) \\ B_t &= \mu\, B_{t-1} + G_t \\ O_t &= \mathrm{NewtonSchulz5}(B_t) \ \approx\ U V^\top \quad \text{if } B_t = U\Sigma V^\top \text{ (SVD)} \\ \theta_t &= \theta_{t-1} - \eta\, O_t \end{aligned}
+$$
+\begin{aligned}
+G_t &= \nabla_{\theta}\mathcal{L}_t(\theta_{t-1}) \\
+B_t &= \mu\, B_{t-1} + G_t \\
+O_t &= \mathrm{NewtonSchulz5}(B_t) \approx U V^\top \quad \text{if } B_t = U\Sigma V^\top \text{ (SVD)} \\
+\theta_t &= \theta_{t-1} - \eta\, O_t
+\end{aligned}
+$$
 Looking at these equations you might wonder why is this a second order method, I only see gradients and no higher oder terms. The second order optimization actually happens inside the Newton Schulz step, but we won’t go into further details here. There are already high-quality blogs that explain Muon in depth, so here we’ll just list the three key ideas of Muon:
 
-1.   **Matrix-wise geometry vs. parameter-wise updates:** AdamW preconditions _per parameter_ (diagonal second moment). Muon treats each weight **matrix** as a single object and updates along G=U V⊤G=UV^{\top} , which captures row/column subspace structure.
-2.   **Isotropic steps via orthogonalization:** Decomposing G=U Σ V⊤G=U\Sigma V^{\top} with singular value decomposition (SVD) separates magnitude ( Σ\Sigma ) from directions (the left/right subspaces U,V U,V ). Replacing G G by U V⊤UV^{\top} discards singular values and makes the step _isotropic_ in the active subspaces. It’s a bit counterintuitive at first—since throwing away Σ\Sigma looks like losing information—but it reduces axis-aligned bias and encourages exploration of directions that would otherwise be suppressed by very small singular values. There’s still an open question on whether this kind of exploration bakes different capabilities into the model that aren’t obvious if you only look at the loss.
+1.   **Matrix-wise geometry vs. parameter-wise updates:** AdamW preconditions _per parameter_ (diagonal second moment). Muon treats each weight **matrix** as a single object and updates along $G = U V^{\top}$, which captures row and column subspace structure.
+2.   **Isotropic steps via orthogonalization:** Decomposing $G = U \Sigma V^{\top}$ with singular value decomposition (SVD) separates magnitude ($\Sigma$) from directions (the left and right subspaces $U, V$). Replacing $G$ by $U V^{\top}$ discards singular values and makes the step _isotropic_ in the active subspaces. It’s a bit counterintuitive at first, since throwing away $\Sigma$ looks like losing information, but it reduces axis-aligned bias and encourages exploration of directions that would otherwise be suppressed by very small singular values. There’s still an open question on whether this kind of exploration bakes different capabilities into the model that aren’t obvious if you only look at the loss.
 3.   **Empirical tolerance to larger batch sizes:** In practice, Muon often tolerates higher batch sizes. We’ll talk about this more in depth in the batch size section, but this might be a key point of Muon adoption!
 
 For years, the community mostly settled on AdamW and the optimizer recipes of frontier labs are often kept secret (Qwen doesn’t talk about theirs, for instance), but recently Muon has seen uptake in high-profile releases (e.g., Kimi K2, GLM-4.5). Hopefully we’ll see more open and robust recipes to use
@@ -1411,22 +1433,47 @@ When batch size grows, each mini-batch gradient is a better estimate of the true
 
 Averaging over B samples
 
-*   Batch gradient: g~B=1 B∑i=1 B g~(i)\tilde{g}_{B} \;=\; \frac{1}{B}\sum_{i=1}^{B} \tilde{g}^{(i)}
-*   Mean stays the same: E ⁣[g~B]=g\mathbb{E}\!\left[\tilde{g}_{B}\right] \;=\; g
-*   But covariance shrinks: C o v ⁣(g~B)=Σ B\mathrm{Cov}\!\left(\tilde{g}_{B}\right) \;=\; \frac{\Sigma}{B}
+*   Batch gradient:
+
+    $$
+    \tilde{g}_B = \frac{1}{B}\sum_{i=1}^{B} \tilde{g}^{(i)}
+    $$
+
+*   Mean stays the same:
+
+    $$
+    \mathbb{E}\!\left[\tilde{g}_B\right] = g
+    $$
+
+*   But covariance shrinks:
+
+    $$
+    \mathrm{Cov}\!\left(\tilde{g}_B\right) = \frac{\Sigma}{B}
+    $$
 
 The SGD parameter update is:
 
-*   Δ w=−η g~B\Delta w \;=\; -\,\eta \,\tilde{g}_{B}
+*   SGD update:
+
+    $$
+    \Delta w = -\,\eta \,\tilde{g}_B
+    $$
 
 The variance of this update is proportional to:
 
-*   V a r(Δ w)∝η 2 Σ B\mathrm{Var}(\Delta w) \;\propto\; \eta^{2}\,\frac{\Sigma}{B}
+*   Update variance:
 
-so to keep the update variance roughly constant, if you scale the batch size by k, you want to scale the learning rate by k\sqrt k . So let’s say you have you have computed your optimal batch size and learning rate and you’ve find that increasing to the critical batch size is possible and increasing the throughput, you’ll need to adapt the optimal learning rate as well.
+    $$
+    \mathrm{Var}(\Delta w) \propto \eta^{2}\,\frac{\Sigma}{B}
+    $$
 
-B critical→k B optimal⇒η critical→k η optimal B_{\text{critical}} \;\rightarrow\; kB_{\text{optimal}} \quad\Rightarrow\quad \eta_{\text{critical}} \;\rightarrow\; \sqrt{k}\eta_{\text{optimal}}
-A useful rule of thumb for optimizers like AdamW or Muon is _**square-root**_ _**LR scaling**_ as batch size grows, but this also depends on the optimizer. For instance using AdamW there are interactions with `beta1` / `beta2` that can introduce very different behavior. A pragmatic alternative is to branch training for a brief window: keep one run at the original batch, start a second with the larger batch and a rescaled LR, and only adopt the larger batch if the two loss curves align after the rescale ([Merrill et al., 2025](https://arxiv.org/abs/2505.23971)). In the paper, they re-warm up the learning rate and reset the optimizer state when switching the batch size. They also set a tolerance and a time window to decide whether the losses “match”, both knobs are chosen empirically. They found that the B s i m p l e B_{simple} estimate - which is also noisy - is underestimating the “actual” critical batch size. This gives you a quick, low-risk check that the new batch/LR pair preserves training dynamics.
+So to keep the update variance roughly constant, if you scale the batch size by $k$, you want to scale the learning rate by $\sqrt{k}$. So let’s say you have computed your optimal batch size and learning rate and found that increasing to the critical batch size is possible while improving throughput, you’ll need to adapt the optimal learning rate as well.
+
+$$
+B_{\text{critical}} \rightarrow k B_{\text{optimal}} \quad\Rightarrow\quad \eta_{\text{critical}} \rightarrow \sqrt{k}\eta_{\text{optimal}}
+$$
+
+A useful rule of thumb for optimizers like AdamW or Muon is _**square-root**_ _**LR scaling**_ as batch size grows, but this also depends on the optimizer. For instance using AdamW there are interactions with `beta1` / `beta2` that can introduce very different behavior. A pragmatic alternative is to branch training for a brief window: keep one run at the original batch, start a second with the larger batch and a rescaled LR, and only adopt the larger batch if the two loss curves align after the rescale ([Merrill et al., 2025](https://arxiv.org/abs/2505.23971)). In the paper, they re-warm up the learning rate and reset the optimizer state when switching the batch size. They also set a tolerance and a time window to decide whether the losses “match”, both knobs are chosen empirically. They found that the $B_{\text{simple}}$ estimate, which is itself noisy, underestimates the “actual” critical batch size. This gives you a quick, low-risk check that the new batch/LR pair preserves training dynamics.
 
 The critical batch size isn’t fixed, it grows as training progresses. Early in training, the model is making big gradient step, so ∥g∥2\lVert g\rVert^2 is big which means B simple B_\text{simple} is small, hence the model have a smaller critical batch size. Later, as the model updates stabilizes and larger batches become more effective. This is why some large-scale trainings don’t keep the batch size constant and use what we can batch size warmup. For example, DeepSeek-V3 begins with a 12.6 M batch for the first ~469 B tokens, then increases to 62.9M for the remainder of training. A batch-size warmup schedule like this serves the same purpose as a learning-rate warmup: it keeps the model on the efficient frontier as the gradient noise scale grows, maintaining stable and efficient optimization throughout.
 
@@ -2688,7 +2735,7 @@ When we review the model’s completions, we see that the model now generates a 
 
 ```
 However, since the jogger and the train are moving in the same direction, the relative speed between them is the difference of their speeds:
-\\( v_{\\text{rel}} = v_t - v_j = 12.7778 - 2.7778 = 10 \\) m/s
+$v_{\text{rel}} = v_t - v_j = 12.7778 - 2.7778 = 10$ m/s
 
  **Wait,**  let me double-check the calculation:
 
@@ -2709,9 +2756,16 @@ But first, the initial position: the jogger is 340 meters ahead of the engine. S
 Hmm, so the jogger is 340 m ahead of the engine along the track. Since they're moving in the same direction, the train is behind the jogger by 340 meters. To pass the jogger, the train has to cover that 340 meters plus the length of the train itself?
 ```
 #### Mitigating reward hacking with overlong penalties
-This issue can mitigated by including an _overlong completion penalty_ , that penalises completions over a certain length. The penalty is parameterised by two arguments max completion length L m a x L_{max} and soft punishment cache L c a c h e L_{cache} . This penalty was one of the improvements proposed in the DAPO paper ([Yu et al., 2025](https://arxiv.org/abs/2503.14476)) and amounts to applying a reward function as follows:
+This issue can be mitigated by including an _overlong completion penalty_ that penalizes completions over a certain length. The penalty is parameterized by two arguments: maximum completion length $L_{\text{max}}$ and soft punishment cache $L_{\text{cache}}$. This penalty was one of the improvements proposed in the DAPO paper ([Yu et al., 2025](https://arxiv.org/abs/2503.14476)) and amounts to applying a reward function as follows:
 
-R length(y)={0,∣y∣≤L max−L cache(L max−L cache−∣y∣)L cache,L max−L cache<∣y∣≤L max−1,L max<∣y∣ R_{\text{length}}(y) = \begin{cases} 0, & |y| \le L_{\text{max}} - L_{\text{cache}} \\ \frac{(L_{\text{max}} - L_{\text{cache}} - |y|)}{L_{\text{cache}}}, & L_{\text{max}} - L_{\text{cache}} < |y| \le L_{\text{max}} \\ -1, & L_{\text{max}} < |y| \end{cases}
+$$
+R_{\text{length}}(y) =
+\begin{cases}
+0, & |y| \le L_{\text{max}} - L_{\text{cache}} \\
+\frac{L_{\text{max}} - L_{\text{cache}} - |y|}{L_{\text{cache}}}, & L_{\text{max}} - L_{\text{cache}} < |y| \le L_{\text{max}} \\
+-1, & L_{\text{max}} < |y|
+\end{cases}
+$$
 Using this penalty, we can directly control the model’s output distribution and measure the tradeoff between increasing response length and performance. An example is shown in the figure below, where we vary the overlong penalty from 1.5k to 4k in steps of 512 tokens:
 
 Applying an overlong penalty constrains the length of each rollout, while also reducing the average reward.
@@ -3984,7 +4038,9 @@ The results show we’re pushing close to the 80GB limit. This means we need som
 
 Now that we know the model fits in memory with some form of parallelism, we need to determine how to achieve our target global batch size (GBS) of approximately 2 million tokens. This constraint gives us our first equation:
 
-GBS=DP×MBS×GRAD_ACC×SEQLEN≈2 M tokens\text{GBS} = \text{DP} \times \text{MBS} \times \text{GRAD\_ACC} \times \text{SEQLEN} \approx 2\text{M tokens}
+$$
+\text{GBS} = \text{DP} \times \text{MBS} \times \text{GRAD\_ACC} \times \text{SEQLEN} \approx 2\text{M tokens}
+$$
 Where:
 
 *   **DP (Data Parallelism)** : Number of data-parallel replicas

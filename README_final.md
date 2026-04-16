@@ -138,7 +138,7 @@ Bloom 的继任者是 2022 年的 StarCoder（[Li et al., 2023](https://arxiv.or
 
 除了迭代速度，数据整理（data curation） 无疑是 LLM 训练中最具影响力的环节。人们天然倾向于扎进架构选择以提升模型，但真正在 LLM 训练上出类拔萃的团队，无一不是对高质量数据近乎偏执。
 
-与迭代速度紧密相关的另一个因素是团队规模：对于主要的预训练任务，只需少数几人，配备足够算力即可。今天预训练一个 Llama 3 级别的模型，大概 $2–3$ 人足矣。只有当你开始涉足更多样化的训练与下游任务（多模态、多语言、后训练等）时，才需要逐步增加人手，以在各领域做到极致。
+与迭代速度紧密相关的另一个因素是团队规模：对于主要的预训练任务，只需少数几人，配备足够算力即可。今天预训练一个 Llama 3 级别的模型，大概 2–3 人足矣。只有当你开始涉足更多样化的训练与下游任务（多模态、多语言、后训练等）时，才需要逐步增加人手，以在各领域做到极致。
 
 所以，从一个装备精良的小团队起步，每 2–3 个月打造一个新模型，用不了多久你就能登顶。接下来，本文的其余部分将聚焦这支团队的日常技术实践！
 
@@ -475,14 +475,14 @@ def count_parameters(
 
 | 模型 | 架构 | 参数量 | 训练 token 数 | 注意力机制 | 上下文长度（最终） | 位置编码 | 精度 | 初始化（标准差） | 优化器 | 最大学习率 | 学习率调度 | 预热步数 | 批量大小 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| DeepSeek LLM 7B | Dense | 7B | 2T | GQA | 4K | RoPE | BF16 | 0.006 | AdamW | $4.2 \times 10^{-4}$ | Multi-Step | 2K | 9.4M |
-| DeepSeek LLM 67B | Dense | 67B | 2T | GQA | 4K | RoPE | BF16 | 0.006 | AdamW | $3.2 \times 10^{-4}$ | Multi-Step | 2K | 18.9M |
-| DeepSeek V2 | MoE | 236B（21B 激活） | 8.1T | MLA | 128K | Partial RoPE | — | 0.006 | AdamW | $2.4 \times 10^{-4}$ | Multi-Step | 2K | 9.4M→37.7M（预热 225B） |
-| DeepSeek V3 | MoE | 671B（37B 激活） | 14.8T | MLA | 129K | Partial RoPE | FP8 | 0.006 | AdamW | $2.2 \times 10^{-4}$ | Multi-Step + Cosine | 2K | 12.6M→62.9M（预热 469B） |
-| MiniMax-01 | MoE + Hybrid | 456B（45.9B 激活） | 11.4T | Linear attention + GQA | 4M | Partial RoPE | — | Xavier init + deepnorm scaling | AdamW | $2 \times 10^{-4}$ | Multi-Step | 500 | 16M→32M→64M→128M |
-| Kimi K2 | MoE | 1T（32B 激活） | 15.5T | MLA | 128K | Partial RoPE | BF16 | 约 0.006 | MuonClip | $2 \times 10^{-4}$ | WSD | 500 | 67M |
-| OLMo 2 7B | Dense | 7B | 5T | MHA | 4K | RoPE | BF16 | 0.02 | AdamW | $3 \times 10^{-4}$ | Cosine | 2K | 4.2M |
-| SmolLM3 | Dense | 3B | 11T | GQA | 128K | NoPE | BF16 | 0.02 | AdamW | $2 \times 10^{-4}$ | WSD | 2K | 2.3M |
+| DeepSeek LLM 7B | Dense | 7B | 2T | GQA | 4K | RoPE | BF16 | 0.006 | AdamW | 4.2 × 10^-4 | Multi-Step | 2K | 9.4M |
+| DeepSeek LLM 67B | Dense | 67B | 2T | GQA | 4K | RoPE | BF16 | 0.006 | AdamW | 3.2 × 10^-4 | Multi-Step | 2K | 18.9M |
+| DeepSeek V2 | MoE | 236B（21B 激活） | 8.1T | MLA | 128K | Partial RoPE | — | 0.006 | AdamW | 2.4 × 10^-4 | Multi-Step | 2K | 9.4M→37.7M（预热 225B） |
+| DeepSeek V3 | MoE | 671B（37B 激活） | 14.8T | MLA | 129K | Partial RoPE | FP8 | 0.006 | AdamW | 2.2 × 10^-4 | Multi-Step + Cosine | 2K | 12.6M→62.9M（预热 469B） |
+| MiniMax-01 | MoE + Hybrid | 456B（45.9B 激活） | 11.4T | Linear attention + GQA | 4M | Partial RoPE | — | Xavier init + deepnorm scaling | AdamW | 2 × 10^-4 | Multi-Step | 500 | 16M→32M→64M→128M |
+| Kimi K2 | MoE | 1T（32B 激活） | 15.5T | MLA | 128K | Partial RoPE | BF16 | 约 0.006 | MuonClip | 2 × 10^-4 | WSD | 500 | 67M |
+| OLMo 2 7B | Dense | 7B | 5T | MHA | 4K | RoPE | BF16 | 0.02 | AdamW | 3 × 10^-4 | Cosine | 2K | 4.2M |
+| SmolLM3 | Dense | 3B | 11T | GQA | 128K | NoPE | BF16 | 0.02 | AdamW | 2 × 10^-4 | WSD | 2K | 2.3M |
 
 如果你现在还不理解其中的一些术语，比如 MLA、NoPE 或 WSD，别担心。我们会在本节逐一解释。此刻只需留意它们的多样性：不同的注意力机制（MHA、GQA、MLA）、位置编码（RoPE、NoPE、Partial RoPE）以及学习率调度策略（Cosine、Multi-Step、WSD）。
 
@@ -520,10 +520,10 @@ $$
 
 | Attention Mechanism（注意力机制） | KV-Cache parameters per token（每个 token 的 KV 缓存参数量） |
 | --- | --- |
-| MHA | $=2×n_{heads}×n_{layers}×dim_{head}$ |
-| MQA | $=2×1×n_{layers}×dim_{head}$ |
-| GQA | $=2×g×n_{layers}×dim_{head}$（通常 $g=2,4,8$） |
-| MLA | $=4.5×n_{layers}×dim_{head}$ |
+| MHA | `2 × n_heads × n_layers × dim_head` |
+| MQA | `2 × 1 × n_layers × dim_head` |
+| GQA | `2 × g × n_layers × dim_head`（通常 `g = 2, 4, 8`） |
+| MLA | `4.5 × n_layers × dim_head` |
 
 现在让我们看看这些注意力机制在真实实验中的表现！
 
@@ -705,11 +705,14 @@ attn_weights = torch.softmax(scores, dim=-1)
 这段代码看起来可能比较复杂，所以我们用一个具体例子来拆解。考虑句子 _“The quick brown fox”_ 中的单词 _“fox”_。在我们的基线 1B 模型中，每个注意力头（attention head）处理的是 64 维的 query/key 向量。RoPE（Rotary Position Embedding，旋转位置编码）会把该向量拆成 32 对：(x₁, x₂)、(x₃, x₄)、(x₅, x₆)……之所以按“对”处理，是因为我们在二维空间里做旋转。为简单起见，只看第一对 (x₁, x₂)。单词 “fox” 在句中处于第 3 个位置，因此 RoPE 会把这对维度旋转：
 
 $$
-\text{rotation\_angle} = \text{position} \times \theta₀
-                        = 3 \times \left(\frac{1}{10000^{0/32}}\right)
-                        = 3 \times 1.0
-                        = 3.0 \text{ 弧度}
-                        = 172°
+\begin{aligned}
+\text{rotation angle}
+&= \text{position} \times \theta_0 \\
+&= 3 \times \left(\frac{1}{10000^{0/32}}\right) \\
+&= 3 \times 1.0 \\
+&= 3.0 \text{ radians} \\
+&= 172^\circ
+\end{aligned}
 $$
 
 基频（base frequency）是 10000，但对第一维对（k=0）而言指数为零，因此基频不影响计算（任何数的 0 次方都是 1）。下图可视化这一过程：
@@ -717,7 +720,8 @@ $$
 当两个 token 通过注意力交互时，“魔法”就出现了。它们旋转后表示的点积，直接通过旋转角的相位差编码了相对距离（其中 `m` 和 `n` 为 token 位置）：
 
 $$
-\text{dot\_product}(\text{RoPE}(x, m), \text{RoPE}(y, n)) = \sum_k [x_k \cdot y_k \cdot \cos((m-n) \cdot \theta_k)]
+\langle \mathrm{RoPE}(x, m), \mathrm{RoPE}(y, n) \rangle
+= \sum_k x_k y_k \cos((m-n)\theta_k)
 $$
 
 注意力模式仅取决于 $(m-n)$，因此相隔 5 个位置的 token 无论处于序列的哪个绝对位置，其角度关系都相同。于是，模型学到的是基于距离的模式，可在序列的任何绝对位置生效，并能外推到更长的序列。
@@ -873,8 +877,9 @@ Sparsity / activation ratio（稀疏度 / 激活比例）
 
 $$
 \begin{aligned}
-\text{activation ratio} &= \frac{\#\text{activated experts}}{\#\text{total experts}} \\[6pt]
-\text{sparsity} &= \frac{\#\text{total experts}}{\#\text{activated experts}} = \frac{1}{\text{activation ratio}}
+\text{activation ratio} &= \frac{n_{\text{activated experts}}}{n_{\text{total experts}}} \\[6pt]
+\text{sparsity} &= \frac{n_{\text{total experts}}}{n_{\text{activated experts}}}
+= \frac{1}{\text{activation ratio}}
 \end{aligned}
 $$
 
@@ -929,7 +934,7 @@ $$
 
 下面是一张表格，列出了部分已发布 MoE 模型的不同取值：
 
-| 模型 | $d_{\text{model}}$ | $d_{\text{expert}}$ | $G = 2 d_{\text{model}} / d_{\text{expert}}$ | 年份 |
+| 模型 | d_model | d_expert | G = 2 × d_model / d_expert | 年份 |
 | --- | --- | --- | --- | --- |
 | Mixtral-8×7B | 4,096 | 14,336 | 0.571 | 2023 |
 | gpt-oss-120b | 2880 | 2880 | 0.5 | 2025 |
@@ -1094,15 +1099,15 @@ $$\mathbf{S}_t \;=\; \mathbf{G}_t \odot \mathbf{S}_{t-1} \;+\; \mathbf{v}_t \mat
 
 | Model | Parameterization | Learnable parameters |
 | --- | --- | --- |
-| Mamba ([A. Gu & Dao, 2024](https://arxiv.org/abs/2312.00752)) | $$\mathbf{G}_t = \exp(-(\mathbf{1}^\top \boldsymbol{\alpha}_t) \odot \exp(\mathbf{A})), \quad \boldsymbol{\alpha}_t = \text{softplus}(\mathbf{x}_t \mathbf{W}_{\alpha_1} \mathbf{W}_{\alpha_2})$$ | $$\mathbf{A} \in \mathbb{R}^{d_k \times d_v}, \quad \mathbf{W}_{\alpha_1} \in \mathbb{R}^{d \times \frac{d}{16}}, \quad \mathbf{W}_{\alpha_2} \in \mathbb{R}^{\frac{d}{16} \times d_v}$$ |
-| Mamba-2 ([Dao & Gu, 2024](https://arxiv.org/abs/2405.21060)) | $$\mathbf{G}_t = \gamma_t \mathbf{1}^\top \mathbf{1}, \quad \gamma_t = \exp(-\text{softplus}(\mathbf{x}_t \mathbf{W}_{\gamma})\exp(a))$$ | $$\mathbf{W}_{\gamma} \in \mathbb{R}^{d \times 1}, \quad a \in \mathbb{R}$$ |
-| mLSTM ([Beck et al., 2025](https://arxiv.org/abs/2503.14376); H. [Peng et al., 2021](https://arxiv.org/abs/2103.02143)) | $$\mathbf{G}_t = \gamma_t \mathbf{1}^\top \mathbf{1}, \quad \gamma_t = \sigma(\mathbf{x}_t \mathbf{W}_{\gamma})$$ | $$\mathbf{W}_{\gamma} \in \mathbb{R}^{d \times 1}$$ |
-| Gated Retention ([Sun et al., 2024](https://arxiv.org/abs/2405.05254)) | $$\mathbf{G}_t = \gamma_t \mathbf{1}^\top \mathbf{1}, \quad \gamma_t = \sigma(\mathbf{x}_t \mathbf{W}_{\gamma})^{\frac{1}{\tau}}$$ | $$\mathbf{W}_{\gamma} \in \mathbb{R}^{d \times 1}$$ |
-| DFW (Mao, 2022; Pramanik et al., 2023) ([Mao, 2022](https://arxiv.org/abs/2210.04243)) | $$\mathbf{G}_t = \boldsymbol{\alpha}_t^\top \boldsymbol{\beta}_t, \quad \boldsymbol{\alpha}_t = \sigma(\mathbf{x}_t \mathbf{W}_{\alpha}), \quad \boldsymbol{\beta}_t = \sigma(\mathbf{x}_t \mathbf{W}_{\beta})$$ | $$\mathbf{W}_{\alpha} \in \mathbb{R}^{d \times d_k}, \quad \mathbf{W}_{\beta} \in \mathbb{R}^{d \times d_v}$$ |
-| GateLoop ([Katsch, 2024](https://arxiv.org/abs/2311.01927)) | $$\mathbf{G}_t = \boldsymbol{\alpha}_t^\top \mathbf{1}, \quad \boldsymbol{\alpha}_t = \sigma(\mathbf{x}_t \mathbf{W}_{\alpha_1})\exp(\mathbf{x}_t \mathbf{W}_{\alpha_2} \mathrm{i})$$ | $$\mathbf{W}_{\alpha_1} \in \mathbb{R}^{d \times d_k}, \quad \mathbf{W}_{\alpha_2} \in \mathbb{R}^{d \times d_k}$$ |
-| HGRN-2 ([Qin et al., 2024](https://arxiv.org/abs/2404.07904)) | $$\mathbf{G}_t = \boldsymbol{\alpha}_t^\top \mathbf{1}, \quad \boldsymbol{\alpha}_t = \gamma + (1-\gamma)\sigma(\mathbf{x}_t \mathbf{W}_{\alpha})$$ | $$\mathbf{W}_{\alpha} \in \mathbb{R}^{d \times d_k}, \quad \gamma \in (0,1)^{d_k}$$ |
-| RWKV-6 ([B. Peng et al., 2024](https://arxiv.org/abs/2404.05892)) | $$\mathbf{G}_t = \boldsymbol{\alpha}_t^\top \mathbf{1}, \quad \boldsymbol{\alpha}_t = \exp(-\exp(\mathbf{x}_t \mathbf{W}_{\alpha}))$$ | $$\mathbf{W}_{\alpha} \in \mathbb{R}^{d \times d_k}$$ |
-| Gated Linear Attention (GLA) | $$\mathbf{G}_t = \boldsymbol{\alpha}_t^\top \mathbf{1}, \quad \boldsymbol{\alpha}_t = \sigma(\mathbf{x}_t \mathbf{W}_{\alpha_1} \mathbf{W}_{\alpha_2})^{\frac{1}{\tau}}$$ | $$\mathbf{W}_{\alpha_1} \in \mathbb{R}^{d \times 16}, \quad \mathbf{W}_{\alpha_2} \in \mathbb{R}^{16 \times d_k}$$ |
+| Mamba ([A. Gu & Dao, 2024](https://arxiv.org/abs/2312.00752)) | `G_t = exp(-(1^T α_t) ⊙ exp(A)), α_t = softplus(x_t W_{α_1} W_{α_2})` | `A ∈ R^{d_k×d_v}, W_{α_1} ∈ R^{d×d/16}, W_{α_2} ∈ R^{d/16×d_v}` |
+| Mamba-2 ([Dao & Gu, 2024](https://arxiv.org/abs/2405.21060)) | `G_t = γ_t 1^T 1, γ_t = exp(-softplus(x_t W_γ) exp(a))` | `W_γ ∈ R^{d×1}, a ∈ R` |
+| mLSTM ([Beck et al., 2025](https://arxiv.org/abs/2503.14376); H. [Peng et al., 2021](https://arxiv.org/abs/2103.02143)) | `G_t = γ_t 1^T 1, γ_t = σ(x_t W_γ)` | `W_γ ∈ R^{d×1}` |
+| Gated Retention ([Sun et al., 2024](https://arxiv.org/abs/2405.05254)) | `G_t = γ_t 1^T 1, γ_t = σ(x_t W_γ)^{1/τ}` | `W_γ ∈ R^{d×1}` |
+| DFW (Mao, 2022; Pramanik et al., 2023) ([Mao, 2022](https://arxiv.org/abs/2210.04243)) | `G_t = α_t^T β_t, α_t = σ(x_t W_α), β_t = σ(x_t W_β)` | `W_α ∈ R^{d×d_k}, W_β ∈ R^{d×d_v}` |
+| GateLoop ([Katsch, 2024](https://arxiv.org/abs/2311.01927)) | `G_t = α_t^T 1, α_t = σ(x_t W_{α_1}) exp(x_t W_{α_2} i)` | `W_{α_1} ∈ R^{d×d_k}, W_{α_2} ∈ R^{d×d_k}` |
+| HGRN-2 ([Qin et al., 2024](https://arxiv.org/abs/2404.07904)) | `G_t = α_t^T 1, α_t = γ + (1-γ) σ(x_t W_α)` | `W_α ∈ R^{d×d_k}, γ ∈ (0,1)^{d_k}` |
+| RWKV-6 ([B. Peng et al., 2024](https://arxiv.org/abs/2404.05892)) | `G_t = α_t^T 1, α_t = exp(-exp(x_t W_α))` | `W_α ∈ R^{d×d_k}` |
+| Gated Linear Attention (GLA) | `G_t = α_t^T 1, α_t = σ(x_t W_{α_1} W_{α_2})^{1/τ}` | `W_{α_1} ∈ R^{d×16}, W_{α_2} ∈ R^{16×d_k}` |
 
 近期模型的门控线性注意力（Gated linear attention）形式，其差异主要体现在 $\mathbf{G}_t$ 的参数化上。偏置项已省略。
 
@@ -1439,10 +1444,12 @@ Muon 一句话总结
 Adam 是一阶方法，因为它只使用梯度。Muon 是一个二阶优化器，它对参数张量的矩阵视图进行操作。
 
 $$
+\begin{aligned}
 G_t &= \nabla_{\theta}\mathcal{L}_t(\theta_{t-1}) \\
 B_t &= \mu\, B_{t-1} + G_t \\
-O_t &= \mathrm{NewtonSchulz5}(B_t) \ \approx\ U V^\top \quad \text{if } B_t = U\Sigma V^\top \text{ (SVD)} \\
+O_t &= \mathrm{NewtonSchulz5}(B_t) \approx U V^\top \quad \text{if } B_t = U\Sigma V^\top \text{ (SVD)} \\
 \theta_t &= \theta_{t-1} - \eta\, O_t
+\end{aligned}
 $$
 
 看到这些公式，你可能会疑惑：这为什么是二阶方法？我只看到了梯度，没看到更高阶项。实际上，二阶优化发生在 Newton-Schulz 步骤内部，但这里不再深入展开。已经有高质量的博客深入解释了 Muon，因此这里只列出 Muon 的三个核心思想：
@@ -1537,17 +1544,39 @@ exotic（奇异的）学习率调度就调研到这里，去烧点 GPU 小时，
 
 对 $B$ 个样本取平均
 
-*   批梯度：$\tilde{g}_{B} = \frac{1}{B}\sum_{i=1}^{B} \tilde{g}^{(i)}$
-*   均值保持不变：$\mathbb{E}\!\left[\tilde{g}_{B}\right] = g$
-*   但协方差缩小：$\mathrm{Cov}\!\left(\tilde{g}_{B}\right) = \frac{\Sigma}{B}$
+*   批梯度：
+
+    $$
+    \tilde{g}_B = \frac{1}{B}\sum_{i=1}^{B} \tilde{g}^{(i)}
+    $$
+
+*   均值保持不变：
+
+    $$
+    \mathbb{E}\!\left[\tilde{g}_B\right] = g
+    $$
+
+*   但协方差缩小：
+
+    $$
+    \mathrm{Cov}\!\left(\tilde{g}_B\right) = \frac{\Sigma}{B}
+    $$
 
 SGD 参数更新为：
 
-*   $\Delta w = -\,\eta \,\tilde{g}_{B}$
+*   SGD 更新：
+
+    $$
+    \Delta w = -\,\eta \,\tilde{g}_B
+    $$
 
 该更新的方差与以下成正比：
 
-*   $\mathrm{Var}(\Delta w) \propto \eta^{2}\,\frac{\Sigma}{B}$
+*   更新方差近似满足下式：
+
+    $$
+    \mathrm{Var}(\Delta w) \propto \eta^{2}\,\frac{\Sigma}{B}
+    $$
 
 因此，为了保持更新方差大致不变，如果将批量大小（batch size）缩放 $k$ 倍，你就需要将学习率（learning rate）缩放 $\sqrt{k}$ 倍。假设你已经计算出了最优的批量大小和学习率，并且发现可以增加到临界批量大小（critical batch size）以提高吞吐量，那么你也需要相应地调整最优学习率。
 
@@ -4147,8 +4176,10 @@ $$\text{Effective Throughput} = 720 \times 10^{12} \text{ FLOPs/sec} \times 0.30
 
 GPU 数量 = 1.98×10²³ FLOPs / (216×10¹² FLOPs/sec × 4 weeks × 604,800 sec/week)
 = 1.98×10²³ / 5.23×10²⁰ ≈ 379 GPUs
-$$\text{GPU Count} = \frac{1.98 \times 10^{23} \text{ FLOPs}}{216 \times 10^{12} \text{ FLOPs/sec} \times 4 \text{ weeks} \times 604,800 \text{ sec/week}}
-= \frac{1.98 \times 10^{23}}{5.23 \times 10^{20}} \approx 379 \text{ GPUs}$$
+$$
+\text{GPU Count} = \frac{1.98 \times 10^{23} \text{ FLOPs}}{216 \times 10^{12} \text{ FLOPs/sec} \times 4 \text{ weeks} \times 604,800 \text{ sec/week}}
+= \frac{1.98 \times 10^{23}}{5.23 \times 10^{20}} \approx 379 \text{ GPUs}
+$$
 
 这一计算指向 375–400 张 H100，我们最终拿到了 384 张 H100，这个数字与我们的并行策略非常契合，并给出了一个现实可行的 4 周时间表，同时为节点故障和重启等意外情况留出了缓冲。
 
