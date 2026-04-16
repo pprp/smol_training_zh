@@ -1,13 +1,7 @@
-Title: The Smol Training Playbook: The Secrets to Building World-Class LLMs
+# The Smol Training Playbook: The Secrets to Building World-Class LLMs
 
-URL Source: https://huggingfacetb-smol-training-playbook.hf.space/
-
-Published Time: Oct. 30, 2025
-
-Markdown Content:
-Table of Contents
-
-Table of Contents
+- Source: [Original article](https://huggingfacetb-smol-training-playbook.hf.space/)
+- Published: Oct. 30, 2025
 
 [Introduction](https://huggingfacetb-smol-training-playbook.hf.space/#introduction)
 -----------------------------------------------------------------------------------
@@ -299,7 +293,7 @@ model:
     hidden_size: 2048
     num_hidden_layers: 16
     num_attention_heads: 32
-    num_key_value_heads: 8  
+    num_key_value_heads: 8
     intermediate_size: 8192
     max_position_embeddings: 4096
     rope_theta: 50000.0
@@ -326,7 +320,7 @@ optimizer:
 parallelism:
   dp: 8  # Data parallel across 8 GPUs
   tp: 1  # No tensor or pipeline parallelism needed at 1B scale
-  pp: 1 
+  pp: 1
 
 ## Tokenizer
 tokenizer:
@@ -339,7 +333,7 @@ tokens:
   micro_batch_size: 3 # GBS (global batch size)=dp * batch_acc* MBS * sequence=1.5M tokens
   sequence_length: 4096
   train_steps: 20000 # GBS * 20000 = 30B
- 
+
  ...(truncated)
 ```
 
@@ -372,7 +366,7 @@ def count_parameters(
         max_position_embeddings=sequence_length,
         tie_word_embeddings=tie_embeddings,
     )
-    model = LlamaForCausalLM(config)  
+    model = LlamaForCausalLM(config)
     return f"{sum(p.numel() for p in model.parameters())/1e9:.2f}B"
 ```
 
@@ -418,9 +412,7 @@ Our ablations evaluation suite includes the benchmarks from [FineWeb](https://hu
 Let’s look at a few example questions from each to get a concrete sense of what these evaluations actually test:
 
 Browse through the examples above to see the types of questions in each benchmark. Notice how MMLU and ARC test factual knowledge with multiple choices, GSM8K requires computing numerical answers to math problems, and HumanEval requires generating complete Python code. This diversity ensures we’re testing different aspects of model capability throughout our ablations.
-
-**Which data mixture for the ablations?**
-
+#### Which data mixture for the ablations?
 For _architecture ablations_ , we train on a fixed mix of high-quality datasets that provide early signal across a wide range of tasks. We use English ([FineWeb-Edu](https://huggingface.co/datasets/HuggingFaceFW/fineweb-edu)), math ([FineMath](https://huggingface.co/datasets/HuggingFaceTB/finemath)), and code ([Stack-Edu-Python](https://huggingface.co/datasets/HuggingFaceTB/stack-edu)). Architectural findings should extrapolate well to other datasets and domains, including multilingual data so we can keep our data mixture simple.
 
 For _data ablations_ , we take the opposite approach: we fix the architecture and systematically vary the data mixtures to understand how different data sources affect model performance.
@@ -504,9 +496,7 @@ But now let’s start with the core of every LLM: the attention mechanism.
 #### [**Attention**](https://huggingfacetb-smol-training-playbook.hf.space/#attention)
 
 One of the most active areas of research around transformer architectures is the attention mechanism. While feedforward layers dominate compute during pretraining, attention becomes the main bottleneck at inference (especially with long contexts), where it drives up compute cost and the KV cache quickly consumes GPU memory, reducing throughput. Let’s take a quick tour around the main attention mechanisms and how they trade-off capacity and speed.
-
-**How many heads for my attention?**
-
+#### How many heads for my attention?
 _Multi-head attention (MHA)_ is the standard attention introduced with the original transformer ([Vaswani et al., 2023](https://arxiv.org/abs/1706.03762)). The main idea is that you have N attention heads each independently doing the same retrieval task: transform the hidden state into queries, keys, and values, then use the current query to retrieve the most relevant token by match on the keys and finally forward the value associated with the matched tokens. At inference time we don’t need to recompute the KV values for past tokens and can reuse them. The memory for past KV values is called the _KV-Cache_ . As context windows grow, this cache can quickly become an inference bottleneck and consume a large share of GPU memory. Here’s a simple calculation to estimate the KV-Cache memory s K V s_{KV} for the Llama 3 architecture with MHA and a sequence length of 8192:
 
 s K V=2×n b y t e s×s e q×n l a y e r s×n h e a d s×d i m h e a d s=2×2×8192×32×32×128=4 GB(Llama 3 8B)=2×2×8192×80×64×128=20 GB(Llama 3 70B)\begin{equation} \begin{aligned} s_{KV} &= 2 \times n_{bytes} \times seq \times n_{layers} \times n_{heads} \times dim_{heads} \\ &= 2 \times 2 \times8192 \times 32 \times 32 \times 128 =4 \text{ GB} \textit{ (Llama 3 8B)} \\ &= 2 \times 2 \times8192 \times 80 \times 64 \times 128 =20 \text{ GB} \textit{ (Llama 3 70B)} \end{aligned} \end{equation}
@@ -528,9 +518,7 @@ The following table compares the attention mechanisms we just discussed in this 
 | MLA | =4.5×n l a y e r s×d i m h e a d= 4.5 \times n_{layers} \times dim_{head} |
 
 Now let’s see how these attention mechanisms fare in real experiments!
-
-**Ablation - GQA beats MHA**
-
+#### Ablation - GQA beats MHA
 Here we compare different attention mechanisms. Our [baseline](https://huggingface.co/datasets/HuggingFaceTB/ablations-training-configs/blob/main/baseline_config_1B.yaml) model uses 32 heads and 8 KV heads which corresponds to GQA with ratio 32/8=4. How would performance change if we used MHA, or if we went for even less KV heads and a higher GQA ratio?
 
 Changing the number of KV heads affects parameter count especially for the MHA case. For consistency, we adjust the number of layers for the MHA run since it would otherwise have a 100M+ parameter discrepancy; for the rest we keep the default 16 layers.
@@ -555,9 +543,7 @@ The results are consistent across both loss curves and downstream evaluations. W
 Based on these ablations, GQA is a solid alternative to MHA. It preserves performance while being more efficient at inference. Some recent models have adopted MLA for even greater KV cache compression, though it hasn’t been as widely adopted yet. We didn’t ablate MLA since it wasn’t implemented in nanotron at the time of the ablations. For SmolLM3, we used GQA with 4 groups.
 
 Beyond the attention architecture itself, the attention pattern we use during training also matters. Let’s have a look at attention masking.
-
-**Document masking**
-
+#### Document masking
 How we apply attention across our training sequences impacts both computational efficiency and model performance. This brings us to _document masking_ and the broader question of how we structure our training samples in the dataloader.
 
 During pretraining, we train with fixed sequence lengths but our documents have variable lengths. A research paper might be 10k tokens while a short code snippet might only have few hundred tokens. How do we fit variable-length documents into fixed-length training sequences? Padding shorter documents to reach our target length wastes compute on meaningless padding tokens. Instead, we use **packing** : shuffle and concatenate documents with end-of-sequence (EOS) tokens, then split the result into fixed-length chunks matching the sequence size.
@@ -566,7 +552,7 @@ Here’s what this looks like in practice:
 
 ```
 File 1: "Recipe for granola bars..." (400 tokens) <EOS>
-File 2: "def hello_world()..." (300 tokens) <EOS>  
+File 2: "def hello_world()..." (300 tokens) <EOS>
 File 3: "Climate change impacts..." (1000 tokens) <EOS>
 File 4: "import numpy as np..." (3000 tokens) <EOS>
 ...
@@ -620,9 +606,7 @@ If you look at the [config](https://huggingface.co/datasets/HuggingFaceTB/traini
 LLMs have two embedding components: input embeddings that serve as a token-to-vector lookup table (of size vocab_size × hidden_dim) and the output embeddings, which is the final linear layer mapping hidden states to vocabulary logits (hidden_dim × vocab_size). In the classic case where these are separate matrices, total embedding parameters are 2 × vocab_size × hidden_dim. Therefore, in small language models, embeddings can constitute a large portion of the total parameter count, especially with a large vocabulary size. This makes embedding sharing (reusing input embeddings in the output) a natural optimization for small models.
 
 Larger models don’t typically use this technique since embeddings represent a smaller fraction of their parameter budget. For example, total embeddings without sharing account for only 13% in Llama3.2 8B and 3% in Llama3.1 70B as show in the pie chart below.
-
-**Ablation - models with tied embeddings match larger untied variants**
-
+#### Ablation - models with tied embeddings match larger untied variants
 Now we will assess the impact of embedding sharing on our ablation model. We draw insights from [MobileLLM’s](https://arxiv.org/abs/2402.14905) comprehensive ablations on this technique at 125M scale, where they demonstrated that sharing reduced parameters by 11.8% with minimal accuracy degradation.
 
 Since untied embeddings increase our parameter count from 1.2B to 1.46B, we will train another model with untied parameters but less layers so it matches the baseline 1.2B in parameters count. We will compare two 1.2B models: our baseline with tied embeddings (16 layers) versus an untied version with fewer layers (12 layers) to maintain the same parameter budget, and the 1.46B model with untied embeddings and the same layer count as our baseline (16) as an additional reference point. You can find the nanotron configs [here](https://huggingface.co/datasets/HuggingFaceTB/training-guide-nanotron-configs/blob/main/baseline_config_1B.yaml).
@@ -638,9 +622,7 @@ We’ve now explored the embedding sharing strategy and its tradeoffs. But embed
 When transformers process text, they face a fundamental challenge: they naturally have no sense of word order, since they consume entire sequences simultaneously through parallel attention operations. This enables efficient training but creates a problem. Without explicit position information, “Adam beats Muon” looks similar to “Muon beats Adam” from the model’s perspective.
 
 The solution is positional embeddings: mathematical encodings that give each token a unique “address” in the sequence. But as we push toward longer and longer contexts - from the 512 tokens of early BERT to today’s million-token models - the choice of positional encoding becomes increasingly critical for both performance and computational efficiency.
-
-**The Evolution of Position Encoding**
-
+#### The Evolution of Position Encoding
 Early transformers used simple **Absolute Position Embeddings (APE)**([Vaswani et al., 2023](https://arxiv.org/abs/1706.03762)), essentially learned lookup tables that mapped each position (1, 2, 3…) to a vector that gets added to token embeddings. This worked fine for short sequences but had a major limitation: models max input sequence length was limited to the max input sequence length they were trained on. They had no out-of-the-box generalisation capabilities to longer sequences.
 
 The field evolved toward **relative position encodings** that capture the distance between tokens rather than their absolute positions. This makes intuitive sense, whether two words are 3 positions apart matters more than whether they’re at positions (5,8) versus (105,108).
@@ -648,9 +630,7 @@ The field evolved toward **relative position encodings** that capture the distan
 **ALiBi** (Attention with Linear Biases) ([Press et al., 2022](https://arxiv.org/abs/2108.12409)), in particular, modifies the attention scores based on token distance. The further apart two tokens are, the more their attention gets penalized through simple linear biases applied to attention weights. For a detailed implementation of Alibi, check this [resource](https://nn.labml.ai/transformers/alibi/index.html).
 
 But the technique that has dominated recent large language models is Rotary Position Embedding (RoPE) ([Su et al., 2023](https://arxiv.org/abs/2104.09864)).
-
-**RoPE: Position as Rotation**
-
+#### RoPE: Position as Rotation
 RoPE’s core insight is to encode position information as rotation angles in a high-dimensional space. Instead of adding position vectors to token embeddings, RoPE rotates the query and key vectors by angles that depend on their absolute positions.
 
 The intuition is that we treat each pair of dimensions in our embeddings as coordinates on a circle and rotate them by an angle determined by:
@@ -670,7 +650,7 @@ def apply_rope_simplified(x, pos, dim=64, base=10000):
     - Each pair of vector dimensions has an index k (0 .. dim/2 - 1).
     - RoPE rotates every pair [x[2k], x[2k+1]] by an angle θ_{p,k}.
 
-    
+
     Formula:
       θ_{p,k} = p * base^(-k / (dim/2))
 
@@ -696,8 +676,8 @@ def apply_rope_simplified(x, pos, dim=64, base=10000):
                         x1 * sin_t + x2 * cos_t])
 
     return torch.stack(rotated)
-    
-    
+
+
 ## Q, K: [batch, heads, seq, d_head]
 Q = torch.randn(1, 2, 4, 8)
 K = torch.randn(1, 2, 4, 8)
@@ -713,10 +693,10 @@ attn_weights = torch.softmax(scores, dim=-1)
 This code might seem complex so let’s break it down with a concrete example. Consider the word _“fox”_ from the sentence _“The quick brown fox”_ . In our baseline 1B model, each attention head works with a 64-dimensional query/key vector. RoPE groups this vector into 32 pairs: (x₁, x₂), (x₃, x₄), (x₅, x₆), and so on. We work on pairs because we rotate around circles in 2D space. For simplicity, let’s focus on the first pair (x₁, x₂). The word “fox” appears at position 3 in our sentence, so RoPE will rotate this first dimension pair by:
 
 ```
-rotation_angle = position × θ₀ 
+rotation_angle = position × θ₀
                 = 3 × (1/10000^(0/32))
-                = 3 × 1.0 
-                = 3.0 radians 
+                = 3 × 1.0
+                = 3.0 radians
                 = 172° degrees
 ```
 
@@ -729,9 +709,7 @@ dot_product(RoPE(x, m), RoPE(y, n)) = Σₖ [xₖ * yₖ * cos((m-n) * θₖ)]
 ```
 
 The attention pattern depends only on (m-n), so tokens that are 5 positions apart will always have the same angular relationship, regardless of their absolute positions in the sequence. Therefore, the model learns distance-based patterns that work at any absolute position in the sequence and can extrapolate to longer sequences.
-
-**How to set RoPE Frequency?**
-
+#### How to set RoPE Frequency?
 In practice, most LLM pretraining starts with relatively short context lengths (2K-4K tokens) using RoPE base frequencies of a few tens thousands like 10K or 50K. Training with very long sequences from the start would be computationally expensive due to attention’s quadratic scaling with sequence length and the limited availability of long-context data (samples > 4K context length) as we’ve seen before in the document masking section of [Attention](https://huggingfacetb-smol-training-playbook.hf.space/#attention). Research also suggests it can hurt short-context performance ([Zhu et al., 2025](https://arxiv.org/abs/2503.15450)). Models typically start by learning short range correlation between words so long sequences don’t help much. The typical approach is to do most pretraining with shorter sequences, then do continual pretraining or spend the final few hundred billion tokens on longer sequences. However, as sequence lengths grow, the rotation angles which are proportional to token positions, grow and can cause attention scores for distant tokens to decay too rapidly ([Rozière et al., 2024](https://arxiv.org/abs/2308.12950); [Xiong et al., 2023](https://arxiv.org/abs/2309.16039)):
 
 ```
@@ -747,9 +725,7 @@ The solution is to increase the base frequency as the sequence length is increas
 These frequency adjustment methods slow down the attention score decay effect and maintain the contribution of distant tokens. For instance, the training of Qwen3 involved increasing the frequency from 10k to 1M using ABF as the sequence length was extended from 4k to 32k context (the team then applies YaRN to reach 131k, 4x extrapolation). Note that there’s no strong consensus on optimal values, and it’s usually good to experiment with different RoPE values during the context extension phase to find what works best for your specific setup and evaluation benchmarks.
 
 Most major models today use RoPE: Llama, Qwen, Gemma, and many others. The technique has proven robust across different model sizes and architectures (dense, MoE, Hybrid). Let’s have a look at a few flavours of rope that have emerged recently.
-
-**Hybrid Positional Encoding Approaches**
-
+#### Hybrid Positional Encoding Approaches
 However as models push toward increasingly large contexts ([Meta AI, 2025](https://ai.meta.com/blog/llama-4-multimodal-intelligence/); [Yang et al., 2025](https://arxiv.org/abs/2501.15383)), even RoPE started to hit performance challenges. The standard approach of increasing RoPE’s frequency during long context extension has limitations when evaluated on long context benchmarks more challenging than Needle in the Haystack (NIAH) ([Kamradt, 2023](https://github.com/gkamradt/LLMTest_NeedleInAHaystack)), such as Ruler and HELMET ([Hsieh et al., 2024](https://arxiv.org/abs/2404.06654); [Yen et al., 2025](https://arxiv.org/abs/2410.02694)). Newer techniques have been introduced to help.
 
 We started this section by saying that transformers need positional information to understand token order but recent research has challenged this assumption. What if explicit positional encodings weren’t necessary after all?
@@ -759,9 +735,7 @@ We started this section by saying that transformers need positional information 
 **RNoPE Hybrid Approach:** Given these trade-offs; [B. Yang et al. (2025)](https://arxiv.org/abs/2501.18795) suggest that combining different positional encoding strategies might be interesting. They introduce, RNoPE alternates between RoPE and NoPE layers throughout the model. RoPE layers provide explicit positional information and handle local context with recency bias, while NoPE layers improve information retrieval across long distances. This technique was recently used in Llama4, Command A and **SmolLM3** .
 
 We’ll call RNoPE “NoPE” for the rest of this blog to keep things simple. (You’ll often see people use “NoPE” to mean RNoPE in discussions).
-
-**Ablation - NoPE matches RoPE on short context**
-
+#### Ablation - NoPE matches RoPE on short context
 Let’s test the hybrid NoPE approach. We’ll compare a pure RoPE 1B ablation baseline against a NoPE variant that removes positional encoding every 4th layer, and a third configuration combining NoPE with document masking to test the interaction between these techniques. Our base question is: can we maintain strong short-context performance while gaining long-context capabilities?
 
 The loss and evaluation results show similar performance across all three configurations, indicating that NoPE maintains strong short-context capabilities while providing the foundation for better long-context handling. Given these results, we adopted the NoPE + document masking combination for SmolLM3.
@@ -777,9 +751,7 @@ so you compute with q~t(h)=x t U(h)∈R d c\tilde q_t^{(h)} = x_t U^{(h)} \in \m
 s t,i(h)=1 d k(x t W q(h))⊤R t−i⏟depends on t−i(c i E(h))s_{t,i}^{(h)} \;=\; \tfrac{1}{\sqrt{d_k}}\,\big(x_t W_q^{(h)}\big)^\top \underbrace{R_{t-i}}_{\text{depends on } t-i}\,\big(c_i E^{(h)}\big)
 
 so you can’t pre-merge W q(h)W_q^{(h)} and E(h)E^{(h)} into a fixed U(h)U^{(h)} . Fix: partial RoPE. Split head dims d k=d nope+d rope d_k = d_{\text{nope}} + d_{\text{rope}} , apply no rotation on the big block (absorb as before: (x t U nope(h))⊤c i(x_t U_{\text{nope}}^{(h)})^\top c_i ) and apply RoPE only on a small block.
-
-**Limiting Attention Scope for Long Contexts**
-
+#### Limiting Attention Scope for Long Contexts
 So far, we’ve explored how to handle positional information for long contexts: activating RoPE, disabling it (NoPE), applying it partially on some layers (RNoPE) or on some hidden dimensions (Partial RoPE), or adjusting its frequency (ABF, YaRN). These approaches modify how the model encodes position to handle sequences longer than those seen during training. But there’s a complementary strategy: instead of adjusting positional encodings, we can limit which tokens attend to each other.
 
 To see why this matters, consider a model pretrained with sequences of 8 tokens. At inference time, we want to process 16 tokens (more than the training length). Positions 8-15 are out of distribution for the model’s positional encodings. While techniques like RoPE ABF address this by adjusting position frequencies, attention scope methods take a different approach: they strategically restrict which tokens can attend to each other, keeping attention patterns within familiar ranges while still processing the full sequence. This reduces both computational cost and memory requirements. The diagram below compares five strategies for handling our 16-token sequence with a pretraining window of 8:
@@ -807,22 +779,16 @@ But having the right architecture is only half the battle. Even well-designed mo
 Let’s now turn to one of the biggest challenges in LLM pretraining: instabilities. Often manifesting as loss spikes or sudden jumps in training loss, these issues become especially common at scale.
 
 While we’ll dive deeper into the different types of spikes and how to handle them in the [Training Marathon](https://huggingfacetb-smol-training-playbook.hf.space/#the-training-marathon) section (diving in floating point precision, optimizers and learning rate), certain architectural and training techniques can also help us reduce instability so let’s take a moment to study them here. We’ll cover a few simple techniques used in recent large-scale training runs (e.g., Olmo2 ([OLMo et al., 2025](https://arxiv.org/abs/2501.00656)) and Qwen3 ([A. Yang, Li, et al., 2025](https://arxiv.org/abs/2505.09388))) to improve stability: Z-loss, removing weight decay from embeddings, and QK-norm.
-
-**Z-loss**
-
+#### Z-loss
 Z-loss ([Chowdhery et al., 2022](https://arxiv.org/abs/2204.02311)) is a regularisation technique that prevents the final output logits from growing too large by adding a penalty term to the loss function. The regularisation encourages the denominator of the softmax over the logits to stay within a reasonable range, which helps maintain numerical stability during training.
 
 L z-loss=λ⋅log⁡2(Z)\mathcal{L}_{\text{z-loss}} = \lambda \cdot \log^2(Z)
 The ablation results below on our 1B model show that adding Z-loss doesn’t impact the training loss or downstream performance. For SmolLM3, we ended up not using it because our Z-loss implementation introduced some training overhead that we didn’t optimize by the time we started training.
-
-**Removing weight decay from embeddings**
-
+#### Removing weight decay from embeddings
 Weight decay is commonly applied to all model parameters as a regularization technique, but [OLMo et al. (2025)](https://arxiv.org/abs/2501.00656)[](https://arxiv.org/abs/2501.00656)found that excluding embeddings from weight decay improves training stability. The reasoning is that weight decay causes embedding norms to gradually decrease during training, which can lead to larger gradients in early layers since the Jacobian of layer normalization is inversely proportional to the input norm ([Takase et al., 2025](https://arxiv.org/abs/2312.16903)).
 
 We tested this approach by training three configurations: our baseline with standard weight decay, a variant with no weight decay on embeddings, and a third configuration combining all our adopted changes (no weight decay on embeddings + NoPE + document masking) to ensure no negative interactions between techniques. The loss curves and evaluation results were nearly identical across all three configurations. So we adopted all 3 changes in SmolLM3 training.
-
-**QKnorm**
-
+#### QKnorm
 QK-norm ([Dehghani et al., 2023](https://arxiv.org/abs/2302.05442)) applies layer normalization to both the query and key vectors before computing attention. This technique helps prevent attention logits from becoming too large and was used in many recent models to improve stability.
 
 However, [B. Yang et al. (2025)](https://arxiv.org/abs/2501.18795) found that QK-norm hurts long-context tasks. Their analysis revealed that QK-norm results in lower attention mass on relevant tokens (needles) and higher attention mass on irrelevant context. They argue this occurs because the normalization operation removes magnitude information from the query-key dot product, which makes the attention logits closer in terms of magnitude. Due to this reason, we didn’t use QK-norm in SmolLM3. Additionally, as a small 3B parameter model, it faces less risk of training instability compared to the larger models where QK-norm has proven most beneficial.
@@ -863,9 +829,7 @@ Here we focus on one objective: given a fixed compute budget, how do we choose a
 We’ll use their notion of _Efficiency Leverage (EL)_ . Simply put, EL measures how much dense compute you’d need to match the loss achieved by an MoE design where the unit of measurement is FLOPs. A higher EL means the MoE configuration is delivering more loss improvement per unit of compute compared to dense training.
 
 Let’s have a closer look how we can setup the sparsity of the MoE to improve the efficiency leverage.
-
-**Sparsity / activation ratio**
-
+#### Sparsity / activation ratio
 > **TL;DR:** more sparsity → better FLOPs efficiency → diminishing returns at very high sparsity → sweetspot depends on your compute budget.
 
 In this section we want to find out which MoE setting is best. Asymptotically it’s easy to see that the two extremes are not ideal settings. On the one hand, activating all experts all the time brings us back to the dense setting where all parameters are used all the time. On the other hand if the active parameters are very low (as an extreme think just of just 1 parameter being active) clearly it won’t be enough to solve a task even in a narrow domain. So clearly we need to find some middle ground. Before we get deeper into finding the optimal setup it is useful to define two quantities: _**activation ratio**_ and its inverse the _**sparsity**_ _:_
@@ -905,9 +869,7 @@ Here is a table with the sparsity of some MoE model:
 | Qwen3-Next-80B-A3B-Instruct | 512 routed + 1 shared = 513 | 10 total active + 1 shared = 11 | 46.6 |
 
 The recent trend is clear: MoE models are getting sparser. That said, the optimal sparsity still depends on hardware and end-to-end efficiency. For example, Step-3 targets peak efficiency and intentionally doesn’t max out sparsity to fit their specific hardware and bandwidth constraints, while gpt-oss-20b have a low sparsity due to on-device memory constraints (the passive expert still take some memory).
-
-**Granularity**
-
+#### Granularity
 Beyond sparsity, we need to decide how large each expert should be. This is captured by granularity, a metric introduced by Ant Group. Let’s pin down what we mean by this term. Terminology varies across papers, and some use slightly different formulas. Here, we’ll use the definition that matches the plots we reference:
 
 G=α∗d m o d e l d e x p e r t with α=2 or 4 G = \frac{\alpha*d_{model}}{d_{expert}} \text{ with } \alpha = 2 \text{ or } 4
@@ -943,17 +905,13 @@ Let’s talk about how granularity shapes behavior (from [Ant Group’s paper](h
 Granularity doesn’t look like the primary driver of EL—it helps, especially going above 2, but it’s not the dominant factor determining the loss. There’s a sweet spot though: pushing granularity higher helps up to a point, and then gains flatten. So granularity is a useful tuning knob with a clear trend toward higher values in recent releases, but it shouldn’t be optimized in isolation.
 
 Another method that is used widely to improve MoEs is the concept of shared experts. Let’s have a look!
-
-**Shared experts**
-
+#### Shared experts
 A shared-expert setup routes every token to a small set of always-on experts. These shared experts absorb the basic, recurring patterns in the data so the remaining experts can specialize more aggressively. In practice, you usually don’t need many of them; model designers commonly choose one, at most two. As granularity increases (e.g., moving from a Qwen3-style setting to something closer to Qwen3-Next), shared experts tend to become more useful. Looking at the following plot, the overall impact is modest, it doesn’t dramatically change the EL. A simple rule of thumb works well in most cases: just use one shared expert, which matches choices in models like DeepSeek V3, K2, and Qwen3-Next and tends to maximize efficiency without adding unnecessary complexity. Figure from [Tian et al. (2025)](https://arxiv.org/abs/2507.17702) .
 
 ![Image 7: Image](https://huggingfacetb-smol-training-playbook.hf.space/_astro/Capture_decran_2025-10-21_a_11_11_38_2931384e-bcac-8008-ad8d-d5ab0c539d3a.ZeQ4Aq4n_Z3EACl.webp)
 
 So a shared expert is an expert where some tokens are always routed through. What about the other experts? How do we learn when to rout to each expert and make sure that we don’t just use a handful of experts? Next we’ll discuss load balancing which tackles exactly that problem.
-
-**Load balancing**
-
+#### Load balancing
 Load balancing is the critical piece in MoE. If it is set up poorly, it can undermine every other design choice. We can see why poor load balancing will cause us a lot of pain on the following example. Consider a very simple distributed training setup where we have 4 GPUs and we distribute the 4 experts of our model evenly across the GPUs. If the routing collapses and all tokens are routed to expert 1 this means that only 1/4 of our GPUs is utilized which is very bad for training and inference efficiency. Besides that, it means that the effective learning capacity of our model also decreased as not all experts are activated.
 
 To address this issue we can we can add an extra loss term to the router. Below you can see the standard auxiliary loss–based load balancing (LBL):
@@ -1011,7 +969,7 @@ Define the running state:
 S t≜∑j=1 t k j v j⊤=K 1:t⊤V 1:t∈R d×d S_t \triangleq \sum_{j=1}^{t} k_j v_j^\top = K_{1:t}^\top V_{1:t} \in \mathbb{R}^{d\times d}
 with the simple update:
 
-S t=S t−1+k t v t⊤S_t = S_{t-1} + k_t v_t^\top 
+S t=S t−1+k t v t⊤S_t = S_{t-1} + k_t v_t^\top
 So we can write:
 
 o t=S t q t=S t−1 q t+v t(k t⊤q t)o_t = S_t q_t = S_{t-1} q_t + v_t (k_t^\top q_t)
@@ -1019,9 +977,7 @@ Why is the reordering important: the left form ∑j≤t(q t⊤k j)v j\sum_{j\le 
 
 (Q K⊤)n×n V=Q(K⊤V)d×d\underset{n\times n}{(QK^\top)}\,V \;=\; Q\,\underset{d\times d}{(K^\top V)}
 So we can see that this looks now very similar to an RNN like structure. This solved our issue, right? Almost. In practice, the softmax plays an important stabilizing role, and the naïve linear form can be unstable without some normalization. This motivates a practical variant called lightning or norm attention!
-
-**Lightning and norm attention**
-
+#### Lightning and norm attention
 This family appears in Minimax01 ([MiniMax et al., 2025](https://arxiv.org/abs/2501.08313)) and, more recently, in Ring-linear ([L. Team, Han, et al., 2025](https://arxiv.org/abs/2510.19338)). Building on the Norm Attention idea ([Qin et al., 2022](https://arxiv.org/abs/2210.10340)). The key step is simple: **normalize the output** . The “Lightning” variant focuses on making the implementation fast and efficient and make the formula a bit different. Here is the formula for both:
 
 NormAttention:
@@ -1034,14 +990,12 @@ Empirically, hybrid model with Norm attention match softmax on most of the tasks
 
 What’s interesting here is that on retrieval tasks like Needle in a Haystack (NIAH) it can do much much better than full softmax attention, which seems surprising but might indicate that there is some synergy when the softmax and the linear layer work together!
 
-Surprisingly, the recently released MiniMax M2 does not use hybrid or linear attention. According to their [pretraining lead](https://huggingfacetb-smol-training-playbook.hf.space/[https://x.com/zpysky1125/status/1983383094607347992](https://x.com/zpysky1125/status/1983383094607347992)), while their early MiniMax M1 experiments with Lightning Attention looked promising at smaller scales on the popular benchmarks at the time (MMLU, BBH, MATH), they found it had “clear deficits in complex, multi-hop reasoning tasks” at larger scales. They also cite numerical precision issues during RL training and infrastructure maturity as key blockers. They conclude that making architecture at scale is a multivariable problem that is hard and compute intensive due to the sensitivity to other parameters like data distribution, optimizer…
+Surprisingly, the recently released MiniMax M2 does not use hybrid or linear attention. According to their [pretraining lead](https://x.com/zpysky1125/status/1983383094607347992), while their early MiniMax M1 experiments with Lightning Attention looked promising at smaller scales on the popular benchmarks at the time (MMLU, BBH, MATH), they found it had “clear deficits in complex, multi-hop reasoning tasks” at larger scales. They also cite numerical precision issues during RL training and infrastructure maturity as key blockers. They conclude that making architecture at scale is a multivariable problem that is hard and compute intensive due to the sensitivity to other parameters like data distribution, optimizer…
 
 However, they acknowledge that “as GPU compute growth slows while data length keeps increasing, the benefits of linear and sparse attention will gradually emerge.” This highlights both the complexity of architecture ablations and the gap between research and production reality.
 
 Now let’s have a look at some more of these methods and how they can be understood with a unified framework.
-
-**Advanced linear attention**
-
+#### Advanced linear attention
 A helpful lesson from recurrent models is to let the state occasionally let go of the past. In practice, that means introducing a gate G t\mathbf{G}_t for the previous state:
 
 S t=G t⊙S t−1+v t k t⊤\mathbf{S}_t \;=\; \mathbf{G}_t \odot \mathbf{S}_{t-1} \;+\; \mathbf{v}_t \mathbf{k}_t^{\top}
@@ -1104,9 +1058,7 @@ Now that we have studied the internals of the model architecture let’s look at
 #### [The tokenizer](https://huggingfacetb-smol-training-playbook.hf.space/#the-tokenizer)
 
 While it rarely steals the spotlight from architecture innovations, the tokenization scheme is likely one of the most underrated components of any language model. Think of it as the translator between human language and the mathematical world our model lives in, and just like any translator, the quality of the translation matters a lot. So how do we build or choose the right tokenizer for our needs?
-
-**Tokenizer fundamentals**
-
+#### Tokenizer fundamentals
 At its core, a tokenizer converts raw text into sequences of numbers that our model can process, by segmenting a running text into individual processable units called tokens. Before diving into the technical details, we should first answer some fundamental questions that will guide our tokenizer design:
 
 *   **What languages do we want to support?** If we’re building a multilingual model but our tokenizer has only seen English, the model will be inefficient when encountering non-English text, which will get split into many more tokens than necessary. This directly impacts performance, training cost and inference speed.
@@ -1114,17 +1066,13 @@ At its core, a tokenizer converts raw text into sequences of numbers that our mo
 *   **Do we know our target data mixture?** If we plan to train our tokenizer from scratch, ideally, we should train it on a sample that mirrors our final training mixture.
 
 Once we have answered these questions, we can examine the main design decisions:
-
-**Vocabulary size**
-
+#### Vocabulary size
 The vocabulary is essentially a dictionary listing all tokens (minimal text units, like words, subwords, or symbols) our model recognizes.
 
 Larger vocabularies compress text more efficiently since we generate fewer tokens per sentence, but there’s a computational trade-off. The vocabulary size directly affects the size of our embedding matrices. If we have vocabulary size V and hidden dimension h, the input embeddings have V × h parameters, and the output layer has another V × h parameters. For smaller models, this becomes a significant chunk of total parameters as we’ve seen in the “Embedding Sharing” section, but the relative cost shrinks as models scale up.
 
 The sweet spot depends on our target coverage and model size. For English-only models, around 50k tokens usually suffices, but multilingual models often need 100k+ to efficiently handle diverse writing systems and languages. Modern state-of-the-art models like Llama3 have adopted vocabularies in the 128k+ range to improve token efficiency across diverse languages. Smaller models in the same family apply embedding sharing to reduce the percentage of embedding parameters while still benefiting from the larger vocabulary. [Dagan et al. (2024)](https://arxiv.org/abs/2402.01035) analyze the impact of vocabulary size on compression, inference and memory. They observe that compression gains from larger vocabularies decrease exponentially, suggesting an optimal size exists. For inference, larger models benefit from bigger vocabularies because compression saves more on the forward pass than the additional embedding tokens cost in softmax. For memory, optimal size depends on sequence length and batch size: longer contexts and large batches benefit from larger vocabs due to KV cache savings from having fewer tokens.
-
-**Tokenization algorithm**
-
+#### Tokenization algorithm
 BPE (Byte-Pair Encoding) ([Sennrich et al., 2016](https://arxiv.org/abs/1508.07909)) remains the most popular choice, other algorithms like WordPiece or SentencePiece exist but are less adopted. There’s also growing research interest in tokenizer-free approaches that work directly on bytes or characters, potentially eliminating tokenization altogether.
 
 Now that we’ve seen the key parameters that define a tokenizer, we face a practical decision: should we use an existing tokenizer or train from scratch? The answer depends on coverage: whether existing tokenizers with our target vocabulary size handle our languages and domains well.
@@ -1134,21 +1082,15 @@ The figure below compares how GPT-2’s English-only tokenizer ([Radford et al.,
 While both tokenizers seem to perform similarly on English, the difference becomes striking for Arabic: GPT2 breaks the text into over a hundred fragments, while Gemma3 produces far fewer tokens thanks to its multilingual training data and larger, more inclusive vocabulary.
 
 But to measure a tokenizer’s quality we can’t just eyeball a few tokenization examples and call it good, the same way we can’t make architecture changes based on intuition without running ablations. We need concrete metrics to evaluate tokenizer quality.
-
-**Measuring Tokenizer Quality**
-
+#### Measuring Tokenizer Quality
 To evaluate how well a tokenizer performs, we can use two key metrics used in FineWeb2 ([Penedo et al., 2025](https://arxiv.org/abs/2506.20920)).
-
-**Fertility:**
-
+#### Fertility:
 It measures the average number of tokens needed to encode a word. Lower fertility means better compression, which translates to faster training and inference. Think of it this way: if one tokenizer needs one or two more tokens to encode most words while another does it in less tokens, the second one is clearly more efficient.
 
 The standard approach for measuring fertility is to calculate **words-to-tokens ratio** (word fertility), which measures how many tokens are needed per word on average. This metric is defined around the concept of words because it provides meaningful cross-linguistic comparisons when appropriate word tokenizers are available, for example in [Spacy](https://spacy.io/) and [Stanza](https://stanfordnlp.github.io/stanza)([Penedo et al., 2025](https://arxiv.org/abs/2506.20920)).
 
 When comparing tokenizers for a single language, you can also use the number of characters or bytes instead of words to get the characters-to-tokens ratio or bytes-to-tokens ratio ([Dagan et al., 2024](https://arxiv.org/abs/2402.01035)). However, these metrics have limitations for cross-linguistic comparison. Bytes can be skewed since characters in different scripts require different byte representations (e.g., Chinese characters use three bytes in UTF-8 while Latin characters use one to two). Similarly, using the number of characters doesn’t account for the fact that words vary dramatically in length across languages. For instance, Chinese words tend to be much shorter than German compound words.
-
-**Proportion of continued words:**
-
+#### Proportion of continued words:
 This metric tells us what percentage of words get split into multiple pieces. Lower percentages are better since it means fewer words get fragmented, leading to more efficient tokenization.
 
 Let’s implement these metrics:
@@ -1159,7 +1101,7 @@ import numpy as np
 def compute_tokenizer_metrics(tokenizer, word_tokenizer, text):
     """
     Computes fertility and proportion of continued words.
-    
+
     Returns:
         tuple: (fertility, proportion_continued_words)
             - fertility: average tokens per word (lower is better)
@@ -1169,19 +1111,17 @@ def compute_tokenizer_metrics(tokenizer, word_tokenizer, text):
     words = word_tokenizer.word_tokenize(text)
     tokens = tokenizer.batch_encode_plus(words, add_special_tokens=False)
     tokens_per_word = np.array(list(map(len, tokens["input_ids"])))
-    
+
     fertility = np.mean(tokens_per_word).item()
     proportion_continued_words = (tokens_per_word >= 2).sum() / len(tokens_per_word)
-    
+
     return fertility, proportion_continued_words
 ```
 
 For specialized domains like code and math, though, besides fertility we need to dig deeper and look at how well the tokenizer handles domain-specific patterns. Most modern tokenizers do single-digit splitting (so “123” becomes [“1”, “2”, “3”]) ([Chowdhery et al., 2022](https://arxiv.org/abs/2204.02311); [DeepSeek-AI et al., 2024](https://arxiv.org/abs/2405.04434)). It might seem counterintuitive to break numbers apart, but it actually helps models learn arithmetic patterns more effectively. If “342792” is encoded as one indivisible token, the model must memorize what happens when you add, subtract, or multiply that specific token with every other number token. But when it’s split, the model learns how digit-level operations work. Some tokenizers like Llama3 ([Grattafiori et al., 2024](https://arxiv.org/abs/2407.21783)) encode numbers from 1 to 999 as unique tokens and the rest are composed of these tokens.
 
 So we can measure fertility on our target domains to assess the weaknesses and strengths of a tokenizer. The table below compares fertility across popular tokenizers for different languages and domains.
-
-**Evaluating tokenizers**
-
+#### Evaluating tokenizers
 To compare tokenizers across different languages, we’ll use the setup from [FineWeb2](https://arxiv.org/abs/2506.20920) tokenizer analysis, using Wikipedia articles as our evaluation corpus. For each language, we’ll sample 100 articles to get a meaningful sample while keeping computation manageable.
 
 First, let’s install dependencies and define which tokenizers and languages we want to compare:
@@ -1229,16 +1169,16 @@ from datatrove.utils.word_tokenizers import load_word_tokenizer
 import pandas as pd
 
 results = []
-	
+
 for tokenizer_name, tokenizer_path in tokenizers:
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_path, trust_remote_code=True)
-    
+
     for lang_name, lang_code, short_lang_code in languages:
         word_tokenizer = load_word_tokenizer(lang_code)
-        
+
         # Compute metrics on Wikipedia
         fertility, pcw = compute_tokenizer_metrics(tokenizer, word_tokenizer, wikis[lang_code])
-        
+
         results.append({
             "tokenizer": tokenizer_name,
             "language": lang_name,
@@ -1293,9 +1233,7 @@ Lower is better
 Lower is better
 
 Gemma3 tokenizer achieves low fertilities and word-splitting rates across multiple languages, notably on English, French, and Spanish, which can be explained by its tokenizer training data and very large vocabulary size of 262k, roughly 2x larger than Llama3’s 128k. Qwen3 tokenizer excels on Chinese, but falls behind Llama3’s tokenizer on English, French and Spanish. Mistral Small’s tokenizer ([Mistral AI, 2025](https://mistral.ai/news/mistral-small-3-1)) performs best on Arabic but falls short of the other tokenizers on English and Chinese.
-
-**Choosing Between Existing and Custom Tokenizers**
-
+#### Choosing Between Existing and Custom Tokenizers
 Currently, there’s a good selection of strong tokenizers available. Many recent models start with something like GPT4’s tokenizer ([OpenAI et al., 2024](https://arxiv.org/abs/2303.08774)) and augment it with additional multilingual tokens. As we can see in the table above, Llama 3’s tokenizer performs well on average across multilingual text and code, while Qwen 2.5 excels particularly on Chinese and some low-resource languages.
 
 *   **When to use existing tokenizers:** If our target use case matches the language or domain coverage of the best tokenizers above (Llama, Qwen, Gemma), then they are solid choices that were battle-tested. For SmolLM3 training we chose Llama3’s tokenizer: it offers competitive tokenization quality on our target languages (English, French, Spanish, Portuguese, Italian) with a modest vocabulary size that made sense for our small model size. For larger models where embeddings are a smaller fraction of total parameters, Gemma3’s efficiency gains become more attractive.
@@ -1377,9 +1315,7 @@ The person writing this part of the blog post thinks it’s because “people ar
 Moreover, comparing optimizers fairly is harder than it looks. Scale changes the dynamics in ways that can be hard to simulate in small ablations, so hyperparameter tuning is complex. You could say: _“it’s ok, I’ve tuned my AdamW for weeks, I can just reuse the same hyperparameters to compare!”_ and we wish so much this would be true. But unfortunately, for each optimizer, you need to do proper hyperparameter search (1D? 2D? 3D?), which makes optimizer research hard and costly.
 
 So let’s start with the classic and the foundation of Durk Kingma’s scary [Google scholar](https://scholar.google.com/citations?user=yyIoQu4AAAAJ&hl=en)domination: AdamW.
-
-**AdamW**
-
+#### AdamW
 Adam (Adaptive Momentum Estimation) is a first order optimization technique. It means that in addition to looking at the gradients alone, we also consider how much the weights changed in the previous steps. This makes the learning rate for each parameter adapt based on the momentum.
 
 The careful reader might wonder: hey there, aren’t you missing a W? Indeed! The reason we specifically add the W (=weight decay) is the following. In standard SGD we can simply add a λ θ 2\lambda \theta^2 (where θ\theta are the weights) to the loss to apply L2 regularization. However, if we do the same with Adam, the adaptive learning rate will also affect the L2 regularization. This means the regularization strength becomes dependent on gradient magnitudes, weakening its effect. This is not what we want and that’s why AdamW applies it decoupled from the main optimization loop to fix this.
@@ -1391,9 +1327,7 @@ Interestingly, across the last few years the AdamW hyperparameters have barely m
 *   weight decay = 0.1 (Llama-3-405B drops this to 0.01)
 
 The same triplet is almost reused from Llama 1,2,3 to DeepSeek-V1,2,3 671B, no change. Was Durk Kingma right all along or can we do better?
-
-**Muon in one line**
-
+#### Muon in one line
 Adam is a first-order methods, as it is only uses the gradients. Muon is a second-order optimizer that acts on the _matrix_ view of a parameter tensor.
 
 G t=∇θ L t(θ t−1)B t=μ B t−1+G t O t=N e w t o n S c h u l z 5(B t)≈U V⊤if B t=U Σ V⊤(SVD)θ t=θ t−1−η O t \begin{aligned} G_t &= \nabla_{\theta}\mathcal{L}_t(\theta_{t-1}) \\ B_t &= \mu\, B_{t-1} + G_t \\ O_t &= \mathrm{NewtonSchulz5}(B_t) \ \approx\ U V^\top \quad \text{if } B_t = U\Sigma V^\top \text{ (SVD)} \\ \theta_t &= \theta_{t-1} - \eta\, O_t \end{aligned}
@@ -1418,9 +1352,7 @@ But the best learning rate isn’t even constant since the learning dynamics cha
 Most modern LLMs use a fixed number of warmup steps (for example 2000) regardless of model size and length of training, as shown in [Table 1](https://huggingfacetb-smol-training-playbook.hf.space/#llms-landscape-pretrain). We’ve found that for long trainings, increasing the number of warmup steps doens’t have an impact on performance, but for very short trainings people usually use 1% to 5% of training steps.
 
 Let’s look at the common schedules, then discuss how to pick the peak value.
-
-**Learning Rate Schedules: Beyond Cosine Decay**
-
+#### Learning Rate Schedules: Beyond Cosine Decay
 It has been known for years that changing the learning rate helps convergence ([Smith & Topin, 2018](https://arxiv.org/abs/1708.07120)) and the cosine decay ([Loshchilov & Hutter, 2017](https://arxiv.org/abs/1608.03983)) was the go-to schedule for training LLMs: start at a peak learning rate after warmup, then smoothly decrease following a cosine curve. It’s simple and works well. But its main disadvantage is inflexibility; we need to know our total training steps upfront, as the cosine cycle length must match your total training duration. This becomes a problem in common scenarios: your model hasn’t plateaued yet or you get access to more compute and want to train longer, or you’re running scaling laws and need to train the same model on different token counts. Cosine decay forces you to restart from scratch.
 
 Many teams now use schedules where you don’t need to start decaying immediately after warmup. This is the case for **Warmup-Stable-Decay (** WSD) ([Hu et al., 2024](https://arxiv.org/abs/2404.06395)) and **Multi-Step**([DeepSeek-AI, :, et al., 2024](https://arxiv.org/abs/2401.02954)) variants shown in the plot below. You maintain a constant high learning rate for most of training, and either sharply decay in the final phase (typically the last 10-20% of tokens) for WSD, or do discrete drops (steps) to decrease the learning rate, for example after 80% of training and then after 90% as it was done in [DeepSeek LLM](https://arxiv.org/abs/2401.02954)’s Multi-Step schedule.
@@ -1439,9 +1371,7 @@ DeepSeek LLM used the baseline Multi-Step schedule (80/10/10). [DeepSeek V2](htt
 DeepSeek-V2 and V3’s technical reports don’t include ablations on these schedule changes. For your setup, start with simple WSD or Multi-Step schedules, then consider tuning the parameters through ablations.
 
 Let’s stop our survey of exotic learning rate schedules here and burn some GPU hours to determine what works in practice!
-
-**Ablation - WSD matches Cosine**
-
+#### Ablation - WSD matches Cosine
 Now it’s time for an ablation! Let’s test whether WSD actually matches cosine’s performance in practice. We won’t show Multi-Step ablations here but we recommend DeepSeek LLM’s ablations where they showed that Multi-Step matches cosine with different phase splits. In this section, we’ll compare cosine decay against WSD with two decay windows: 10% and 20%.
 
 The evaluation results show similar final performance across all three configurations. Looking at the loss and evaluation curves (specifically HellaSwag), we see an interesting pattern: cosine achieves better loss and evaluation scores during the stable phase (before WSD’s decay begins). However, once WSD enters its decay phase, there’s an almost linear improvement in both loss and downstream metrics allowing WSD to catch up to cosine by the end of training.
@@ -1451,17 +1381,13 @@ This confirms that WSD’s 10-20% decay window is sufficient to match cosine’s
 If you’re comparing intermediate checkpoints between cosine and WSD during the stable phase, make sure to apply a decay to the WSD checkpoint for a fair comparison.
 
 Now that we have a good overview of popular learning rate schedules, the next question is: what should the peak learning rate actually be?
-
-**Finding The Optimal Learning Rate**
-
+#### Finding The Optimal Learning Rate
 How do we pick the right learning rates for our specific learning rate scheduler and training setups?
 
 We could run learning rate sweeps on short ablations like we did for architecture choices. But optimal learning rate depends on training duration: a learning rate that converges fastest in a short ablation might not be the best one for the full run. And we can’t afford to run expensive multi-week trainings multiple times just to test different learning rates.
 
 Let’s first look at simple sweeps we can quickly run that help us rule out learning rates that are much too high or low and then we’ll discuss scaling laws for hyperparameters.
-
-**Ablation - LR sweeps**
-
+#### Ablation - LR sweeps
 To illustrate the impact of different learning rates, let’s look at a sweep on our 1B ablation model trained on 45B tokens. We train the same model, under the same setup with 4 different learning rates: 1e-4, 5e-4, 5e-3, 5e-2. The results clearly show the dangers at both extremes:
 
 LR 5e-2 diverges almost immediately, the loss spikes early and never recovers, making the model unusable. LR 1e-4 is too conservative, while it trains stably, it converges much more slowly than the other learning rates. The middle ground of 5e-4 and 5e-3 show better convergence and comparable performance. But running sweeps for every model size gets expensive quickly, and more importantly, it doesn’t account for the planned number of training tokens as we previously stated. This is where scaling laws become invaluable.
@@ -1572,7 +1498,7 @@ We’ve talked a lot about the “what” (optimizer, learning rate, batch size)
 
 ![Image 10: Image](https://huggingfacetb-smol-training-playbook.hf.space/_astro/Capture_decran_2025-10-27_a_22_10_05_2991384e-bcac-802a-a6e6-dab0f9f410ec.CKOEFjcT_b6hhb.webp)
 
-One more ablation won't hurt (Spoiler: It did). Credits to [sea_snell](https://huggingfacetb-smol-training-playbook.hf.space/[https://x.com/sea_snell/status/1905163154596012238](https://x.com/sea_snell/status/1905163154596012238))
+One more ablation won't hurt (Spoiler: It did). Credits to [sea_snell](https://x.com/sea_snell/status/1905163154596012238)
 
 Perfect is the enemy of good, especially when we’re working with finite compute budgets and deadlines.
 
@@ -1588,7 +1514,7 @@ This shifted the field from “make models bigger” to “train them longer and
 
 While scaling laws provide a suggestion for the model size and training duration given a particular compute budget, choosing to overtrain means you have to decide these factors yourself. For SmolLM3, we started by picking a target model size of 3 billion parameters. Based on recent models of a similar scale like Qwen3 4B, Gemma 3 4B, and Llama 3.2 3B, we considered 3B to be large enough to have meaningful capabilities (such as reasoning and tool calling), but small enough to enable super fast inference and efficient local usage. To pick a training duration, we first noted that recent models have been _extremely_ overtrained — for example, the aforementioned Qwen3 series is claimed to have been trained for 36T tokens! As a result, training duration is often dictated by the amount of compute available. We secured 384 H100s roughly a month, which provided a budget for training on 11 trillion tokens (assuming an MFU of ~30%).
 
-Despite these deviations, scaling laws remain practically valuable. They provide baselines for experimental design, people often use Chinchilla-optimal setups to get signal on ablations, and they help predict whether a model size can reach a target performance. As de Vries notes in this [blog](https://huggingfacetb-smol-training-playbook.hf.space/[https://www.harmdevries.com/post/model-size-vs-compute-overhead/](https://www.harmdevries.com/post/model-size-vs-compute-overhead/)), by scaling down model size you can hit a critical model size: the minimal capacity required to reach a given loss, below which you start getting diminishing return.
+Despite these deviations, scaling laws remain practically valuable. They provide baselines for experimental design, people often use Chinchilla-optimal setups to get signal on ablations, and they help predict whether a model size can reach a target performance. As de Vries notes in this [blog](https://www.harmdevries.com/post/model-size-vs-compute-overhead/), by scaling down model size you can hit a critical model size: the minimal capacity required to reach a given loss, below which you start getting diminishing return.
 
 Now that we’re settled on our model architecture, training setup, model size, and training duration, we need to prepare two critical components: the data mixture that will teach our model, and the infrastructure that will train it reliably. With SmolLM3’s architecture set at 3B parameters,we needed to curate a data mixture that would deliver strong multilingual, math and code performance, and set up infrastructure robust enough for 11 trillion tokens of training. Getting these fundamentals right is essential, even the best architectural choices won’t save us from poor data curation or unstable training systems.
 
@@ -1725,9 +1651,7 @@ Our team has been through this many times: from StarCoder and StarCoder2, to Smo
 ### [Pre-flight checklist: what to verify before hitting “train”](https://huggingfacetb-smol-training-playbook.hf.space/#pre-flight-checklist-what-to-verify-before-hitting-train)
 
 Before hitting “train”, we go through a checklist to ensure everything works end-to-end:
-
-**Infrastructure readiness:**
-
+#### Infrastructure readiness:
 *   If your cluster supports Slurm reservations, use them. For SmolLM3, we had a fixed 48-node reservation for the entire run. That meant no queueing delays, consistent throughput, and the ability to track node health over time.
 *   Stress-test GPUs before launch (we use [GPU Fryer](https://github.com/huggingface/gpu-fryer) and [DCGM Diagnostics](https://docs.nvidia.com/datacenter/dcgm/latest/user-guide/dcgm-diagnostics.html)) to catch throttling or performance degradation. For SmolLM3, we found two GPUs throttling and replaced them before starting the run.
 *   Avoid storage bloat: our system uploads each checkpoint to S3, then deletes the local copy right after saving the next one, so we never store more than one on the fast local GPU SSDs.
@@ -1773,9 +1697,7 @@ Our cluster has three storage tiers for training data:
 You can find more details in the [Infrastructure chapter](https://huggingfacetb-smol-training-playbook.hf.space/#infrastructure---the-unsung-hero).
 
 For SmolLM3’s 24TB dataset, we initially stored the data in FSx (Weka). With 24TB of training data, on top of storage already used by several other teams, we were pushing Weka’s storage to the limit. So it started evicting dataset shards mid-training, which meant we had to fetch them back, creating stalls, which explained the big throughput jump. Worse: there was no way to pin our dataset folders as hot for the full training.
-
-**Fix #1 – Changing data storage**
-
+#### Fix #1 – Changing data storage
 We didn’t find a way to pin our dataset folders as hot for the full training in Weka, so we tried to change the storage method. Streaming directly from S3 was slow, so we decided to store the data in each node in its local storage `/scratch` .
 
 This came with a catch: If a node died and was replaced, the new replacement GPUs had no data. Downloading 24TB from S3 with `s5cmd` took 3h. We cut that to 1h30 by copying from another healthy node using `fpsync` instead of going through S3. This was faster given all the nodes were in the same datacenter.
@@ -1811,9 +1733,7 @@ The results shown in the figure below were clear: shorter runs had small through
 That’s when we realized we’d never actually done large-scale pretraining with nanotron’s dataloader. SmolLM2 had been trained with steady throughput using a Megatron-LM derived dataloader ([TokenizedBytes](https://github.com/huggingface/nanotron/blob/7bc9923285a03069ebffe994379a311aceaea546/src/nanotron/data/tokenized_bytes.py#L80)) through an internal wrapper around nanotron. For SmolLM3, we switched to nanotron’s built-in dataloader ( `nanosets` ).
 
 After deep diving into its implementation, we found that it was naively building one giant index that grew with each training step. For very large steps, this caused a higher shared memory which triggered throughput drops.
-
-**Fix #2 – Bring in TokenizedBytes dataloader**
-
+#### Fix #2 – Bring in TokenizedBytes dataloader
 To confirm that the dataloader was indeed the culprit, we launched the same configuration with our internal SmolLM2 framework using `TokenizedBytes` dataloader. No drops. Even on 48 nodes using the same datasets.
 
 Fastest path forward: copy this dataloader into nanotron. The drops were gone and the throughput back to target.
@@ -1827,9 +1747,7 @@ With the new dataloader, we didn’t have throughput drops but the loss curve lo
 `nanosets` had been producing smoother loss, and the difference rang a bell from an old debugging war: a few years ago, we’d found a shuffling bug in our pretraining code where documents were shuffled, but sequences inside a batch were not, leading to small spikes.
 
 Checking our new dataloader confirmed it: it was reading sequences sequentially from each document. That’s fine for short files, but with domains like code, a single long low-quality file can fill an entire batch and cause loss spikes.
-
-**Fix #3 – Shuffle at the sequence level**
-
+#### Fix #3 – Shuffle at the sequence level
 We had two options:
 
 1.   Change the dataloader to do random access (risk: higher memory usage).
@@ -1848,17 +1766,13 @@ By now we had:
 *   **Clean, sequence-level shuffling** (offline pre-shuffle per epoch)
 
 We relaunched. This time, everything held. The loss curve was smooth, throughput was consistent, and we could finally focus on training instead of firefighting.
-
-**Mystery #4 – Unsatisfactory performance**
-
+#### Mystery #4 – Unsatisfactory performance
 After fixing the throughput and dataloader issues, we launched the run again and trained smoothly for the first two days. Throughput was stable, loss curves looked as expected, and nothing in the logs suggested any problems. At around the 1T token mark, however, the evaluations revealed something unexpected.
 
 As part of our monitoring, we evaluate intermediate checkpoints and compare them to historical runs. For instance, we had the [intermediate checkpoints](https://huggingface.co/HuggingFaceTB/SmolLM2-1.7B-intermediate-checkpoints)from SmolLM2 (1.7B) trained on a similar recipe, so we could track how both models progressed at the same stages of training. The results were puzzling: despite having more parameters and a better data mixture, the 3B model was performing worse than the 1.7B at the same training point. Loss was still decreasing, and benchmark scores were improving, but the improvement rate was clearly below expectations.
 
 Given that we had thoroughly tested every architecture and data change introduced in SmolLM3 compared to SmolLM2, we validated the training framework and there were only a few remaining untested differences between the two training setups. The most obvious was tensor parallelism. SmolLM2 could fit on a single GPU and was trained without TP, while SmolLM3 required TP=2 to fit in memory. We didn’t suspect it or think of testing it before, since TP was used in the 3B ablations and their results made sense.
-
-**Fix #4 - The final fix**
-
+#### Fix #4 - The final fix
 To test the TP bug hypothesis, we trained a 1.7B model with the exact same setup as SmolLM3 — same architecture changes (document masking, NoPE), same data mixture, same hyperparameters — both with and without TP. The difference was immediate: the TP version consistently had a higher loss and lower downstream performance than the non-TP version. That confirmed we were looking at a TP-related bug.
 
 We then examined the TP implementation in detail, comparing weights from TP and non-TP runs. The problem turned out to be subtle but significant: we were using identical random seeds across all TP ranks, when each rank should have been initialised with a different seed. This caused correlated weight initialisation across shards, which affected convergence. The effect was not catastrophic — the model still trained and improved — but it introduced enough inefficiency to explain the gap we observed at scale. Below is the bug fix:
@@ -1919,9 +1833,7 @@ While we don’t fully understand training instabilities, we know they become mo
 *   Data-parameter state interactions: PaLM ([Chowdhery et al., 2022](https://arxiv.org/abs/2204.02311)) observed that spikes often result from specific combinations of data batches and model parameter states, rather than “bad data” alone. Training on the same problematic batches from a different checkpoint didn’t reproduce the spikes.
 *   Poor initialisation: Recent work by OLMo2 ([OLMo et al., 2025](https://arxiv.org/abs/2501.00656)) showed that switching from scaled initialisation to a simple normal distribution (mean=0, std=0.02) improved stability.
 *   Precision issues: While no one trains with FP16 anymore, [BLOOM](https://arxiv.org/abs/2211.05100) found it highly unstable compared to BF16.
-
-**Before spikes happen, build in stability:**
-
+#### Before spikes happen, build in stability:
 Small models with conservative learning rates and good data rarely spike, but larger models require proactive stability measures. As more teams have trained at scale, we’ve accumulated a toolkit of techniques that help prevent training instability:
 
 Data filtering and shuffling: By this point in the blog, you’ve noticed how often we circle back to data. Making sure your data is clean and well-shuffled can prevent spikes. For instance, OLMo2 found that removing documents with repeated n-grams (32+ repetitions of 1-13 token spans) significantly reduced spike frequency.
@@ -1929,9 +1841,7 @@ Data filtering and shuffling: By this point in the blog, you’ve noticed how of
 Training modifications: Z-loss regularisation keeps output logits from growing too large without affecting performance. And excluding embeddings from weight decay also helps.
 
 Architectural changes: QKNorm (normalising query and key projections before attention) has proven effective. OLMo2 and other teams found it helps with stability, and interestingly, [Marin team](https://wandb.ai/marin-community/marin/reports/Marin-32B-Work-In-Progress--VmlldzoxMzM1Mzk1NQ) found that it can even be applied mid-run to fix divergence issues.
-
-**When spikes happen anyway - damage control:**
-
+#### When spikes happen anyway - damage control:
 Even with these precautions, spikes can still occur. Here are some options for fixing them:
 
 *   **Skip problematic batches** : Rewind to before the spike and skip the problematic batches. This is the most common fix for spikes. The Falcon team ([Almazrouei et al., 2023](https://arxiv.org/abs/2311.16867)) skipped 1B tokens to resolve their spikes, while the PaLM team ([Chowdhery et al., 2022](https://arxiv.org/abs/2204.02311)) found that skipping 200-500 batches around the spike location prevented recurrence.
@@ -1959,13 +1869,9 @@ The chart below show our 3 training stages and the progression of our web/code/m
 #### [Long context extension: From 4k to 128k tokens](https://huggingfacetb-smol-training-playbook.hf.space/#long-context-extension-from-4k-to-128k-tokens)
 
 Context length determines how much text your model can process, it’s crucial for tasks like analysing long documents, maintaining coherent multi-turn conversations, or processing entire codebases. SmolLM3 started training at 4k tokens, but we needed to scale to 128k for real-world applications.
-
-**Why extend context mid-training?**
-
+#### Why extend context mid-training?
 Training on long contexts from the start is computationally expensive since attention mechanisms scale quadratically with sequence length. Moreover, research shows that extending context with a few dozen to a hundred billion tokens toward the end of training, or during continual pretraining, is enough to reach good long context performance ([Gao et al., 2025](https://arxiv.org/abs/2410.02660)).
-
-**Sequential scaling: 4k→32k→64k**
-
+#### Sequential scaling: 4k→32k→64k
 We didn’t jump straight to 128k. Instead, we gradually extended context in stages, giving the model time to adapt at each length before pushing further. We ran two long context stages: first from 4k to 32k, then from 32k to 64k (the 128k capability comes from inference-time extrapolation, not training). We found that starting a fresh learning rate schedule for each stage over 50B tokens worked better than extending context during the last 100B tokens of the main decay phase. At each stage, we ran ablations to find a good long context data mix and RoPE theta value, and evaluated on the Ruler benchmark.
 
 During the long context ablations, we found [HELMET](https://arxiv.org/abs/2410.02694) benchmark to be very noisy on base models (the same training with different seeds gives variable results). [Gao et al.](https://arxiv.org/abs/2410.02660) recommend doing SFT on top to reduce variance on the benchmarks’ tasks. Instead we opted for RULER, which we found to give more reliable signal at the base model level.
@@ -2235,7 +2141,7 @@ When it comes to choosing or designing a chat template, there isn’t a one-size
 
 *   **Can users customise the system role?**If users should be able to define their own system prompts (e.g. “act like a pirate”), the template needs to handle that cleanly.
 *   **Does the model need tools?** If your model needs to call APIs, the template needs to accommodate structured outputs for tool calls and responses.
-*   **Is it a reasoning model?** Reasoning models use templates like `<think> ... </think>` to separate the model’s “thoughts” from its final answer. Some models discard the reasoning tokens across turns in a conversation, and the chat template needs to handle that logic.
+*   **Is it a reasoning model?** Reasoning models use templates like ``<think>`` ... ``</think>`` to separate the model’s “thoughts” from its final answer. Some models discard the reasoning tokens across turns in a conversation, and the chat template needs to handle that logic.
 *   **Will it work with inference engines?** Inference engines like vLLM and SGLang have dedicated parsers for reasoning and tools[2](https://huggingfacetb-smol-training-playbook.hf.space/#user-content-fn-f2). Compatibility with these parsers saves a lot of pain later, especially in complex agent benchmarks where consistent tool calls are essential.[3](https://huggingfacetb-smol-training-playbook.hf.space/#user-content-fn-f3)
 
 The table below shows a few popular chat templates and how they compare across the key considerations:
@@ -2244,7 +2150,7 @@ The table below shows a few popular chat templates and how they compare across t
 | --- | --- | --- | --- | --- | --- |
 | ChatML | ✅ | ✅ | ❌ | ✅ | Simple and good for most use cases. |
 | Qwen3 | ✅ | ✅ | ✅ | ✅ | Hybrid reasoning template |
-| DeepSeek-R1 | ❌ | ❌ | ✅ | ✅ | Prefills reasoning content with `<think>` . |
+| DeepSeek-R1 | ❌ | ❌ | ✅ | ✅ | Prefills reasoning content with ``<think>``. |
 | Llama 3 | ✅ | ✅ | ❌ | ✅ | Has built-in tools like a Python code interpreter. |
 | Gemma 3 | ✅ | ❌ | ❌ | ❌ | System role customisation defined at the first user turn. |
 | Command A Reasoning | ✅ | ✅ | ✅ | ❌ | Multiple chat templates per model. |
@@ -2252,6 +2158,7 @@ The table below shows a few popular chat templates and how they compare across t
 
 In most cases, we’ve found that ChatML or Qwen’s chat templates are an excellent place to start. For SmolLM3, we needed a template for hybrid reasoning and found that Qwen3 was one of the few templates that struck a good balance across the dimensions we cared about. However, it had one quirk that we weren’t entirely happy with: the reasoning content is _discarded_ for all but the final turn in a conversation. As shown in the figure below, this is similar to how [OpenAI’s reasoning models work](https://platform.openai.com/docs/guides/reasoning/how-reasoning-works):
 
+```mermaid
 flowchart LR
     subgraph Turn1 ["Turn 1"]
         T1_Input["**INPUT**"]
@@ -2296,6 +2203,7 @@ flowchart LR
     class TruncatedOutput truncated
     class Turn1,Turn2,Turn3 subgraphStyle
     linkStyle 4 stroke:#333,stroke-width:2px,fill:#f8f9fa
+```
 
 Although this makes sense for _inference_ (to avoid blowing up the context), we concluded that for _training_ it is important to _retain the reasoning tokens across all turns_ in order to condition the model appropriately.
 
@@ -2446,29 +2354,30 @@ Fixing this bug had no impact on the evals, but finally we were confident the ch
 
 During the development of [Open-R1](https://github.com/huggingface/open-r1), we noticed that training a base model entirely on single-turn reasoning data would fail to generalise to multi-turn. This is not a surprise; absent such examples, the model is being tested outside its training distribution.
 
-To measure this quantitatively for SmolLM3, we took inspiration from Qwen3, who developed an internal eval called _ThinkFollow_ , which randomly inserts `/think` or `/no_think` tags to test whether the model can consistently switch reasoning modes. In our implementation, we took the prompts from Multi-IF and then checked if the model generated empty or non-empty think blocks enclosed in the `<think>` and `</think>` tags. As expected, the results from our hybrid baseline showed the model failing abysmally to enable the reasoning mode beyond the first turn:
+To measure this quantitatively for SmolLM3, we took inspiration from Qwen3, who developed an internal eval called _ThinkFollow_ , which randomly inserts `/think` or `/no_think` tags to test whether the model can consistently switch reasoning modes. In our implementation, we took the prompts from Multi-IF and then checked if the model generated empty or non-empty think blocks enclosed in the ``<think>`` and ``</think>`` tags. As expected, the results from our hybrid baseline showed the model failing abysmally to enable the reasoning mode beyond the first turn:
 
 To fix this capability, we constructed a new dataset called IFThink. Based on the Multi-IF pipeline, we used single-turn instructions from [Tulu 3’s instruction-following subset](https://huggingface.co/datasets/allenai/tulu-3-sft-personas-instruction-following) and expanded them into multi-turn exchanges using Qwen3-32B to both generate both verifiable instructions and reasoning traces. The method is illustrated below:
 
+```mermaid
 flowchart TD
     %% Inputs
     IFEval["Tülu3 IF Dataset"]
     InstructionTypes["Set of instruction types"]
-    
+
     %% English Multi-Turn Generation
     SingleTurn["Single turn prompt"]
     LLM1["Generate instructions with Qwen3-32B"]
-    
+
     subgraph Turns ["Multi-turn prompts"]
         Turn1["Prompt @ turn 1"]
         Turn2["Prompt @ turn 2"]
         Turn3["Prompt @ turn 3"]
     end
-    
+
     MultiTurn["Generate reasoning traces with Qwen3-32B"]
-    
+
     IFThink["IFThink"]
-    
+
     %% Connections
     IFEval --> SingleTurn
     IFEval --> InstructionTypes
@@ -2476,24 +2385,26 @@ flowchart TD
     InstructionTypes --> LLM1
     LLM1 --> Turn2
     LLM1 --> Turn3
-    
+
     Turn1 --> MultiTurn
     Turn2 --> MultiTurn
     Turn3 --> MultiTurn
-    
+
     MultiTurn --> IFThink
-    
+
     %% Styling
     classDef question fill:#ffd0c5
     classDef decision fill:#f9f9f9
     classDef success fill:#d1f2eb
     classDef danger fill:#fef3c7
     classDef category fill:#fef3c7
-    
+
     class IFEval,InstructionTypes question
     class SingleTurn,LLM1,MultiTurn decision
     class Turn1,Turn2,Turn3 decision
     class IFThink success
+```
+
 Including this data in our baseline mix produced a dramatic improvement:
 
 After fixing the multi-turn reasoning issue with IFThink, our baseline finally behaved as intended; it could stay consistent across turns, follow instructions, and use the chat template correctly. With that foundation in place, we turned back to the basics: tuning the training setup itself.
@@ -2501,9 +2412,7 @@ After fixing the multi-turn reasoning issue with IFThink, our baseline finally b
 #### [Which hyperparameters actually matter?](https://huggingfacetb-smol-training-playbook.hf.space/#which-hyperparameters-actually-matter)
 
 In SFT, there are only a few hyperparameters that actually matter. Learning rate, batch size, and packing determine almost everything about how efficiently your model trains and how well it generalises. In our baby baselines, we picked reasonable defaults just to validate the data and chat template. Now that the setup was stable, we revisited these choices to see how much impact they have on our baseline.
-
-**Masking user turns**
-
+#### Masking user turns
 One subtle design choice for the chat template is whether to mask the user turns during training. In most chat-style datasets, each training example consists of alternating user and assistant messages (possibly with interleaved tool calls). If we train the model to predict all tokens, it effectively learns to autocomplete user queries, rather than focusing on producing high-quality assistant responses.
 
 As shown in the figure below, masking user turns prevents this by ensuring the model’s loss is only computed on assistant outputs, not user messages:
@@ -2548,9 +2457,7 @@ print(rendered_input)
 ```
 
 In practice, masking doesn’t have a huge impact on downstream evals and usually provides a few points improvement in most cases. With SmolLM3, we found it had the most impact on IFEval, likely because the model is less inclined to restate the prompt and follow the various constraints more closely. A comparison of how user masking affected each eval and reasoning mode is shown below:
-
-**To pack or not to pack?**
-
+#### To pack or not to pack?
 As we Sequence packing is one of the training details that makes a huge difference to training efficiency. In SFT, most datasets contain samples of variable length, which means each batch contains a large number of padding tokens that waste compute and slow convergence.
 
 Packing solves this by concatenating multiple sequences together until a desired maximum token length is achieved. There are various ways to perform the concatenation, with TRL adopting a “best-fit decreasing” strategy ([Ding et al., 2024](https://arxiv.org/abs/2404.10830)), where the ordering of sequences to pack is determined by their length. As shown below, this strategy minimises truncation of documents across batch boundaries, while also reducing the amount of padding tokens:
@@ -2568,9 +2475,7 @@ More generally, we see that once the effective batch size is large than 32, ther
 In practice, for large-scale SFT where the dataset is massive, packing is almost always beneficial since the compute savings far outweigh any minor differences in gradient frequency. However, for smaller or more diverse datasets—like domain-specific fine-tuning or instruction-tuning on limited human-curated data—it might be worth disabling packing to preserve sample granularity and ensure every example contributes cleanly to optimisation.
 
 Ultimately, the best strategy is empirical: start with packing enabled, monitor both throughput and downstream evals, and adjust based on whether the speed gains translate into equivalent or improved model quality.
-
-**Tuning the learning rate**
-
+#### Tuning the learning rate
 We now come to the last, but still important hyperparameter: the learning rate. Set it too high and training may diverge; too low and convergence is painfully slow.
 
 In SFT, the optimal learning rate is typically an order of magnitude (or more) smaller than the one used during pretraining. This is because we’re initialising from a model with rich representations, and aggressive updates can lead to catastrophic forgetting.
@@ -2580,9 +2485,7 @@ Unlike pre-training, where hyperparameter sweeps on the full run are prohibitive
 In our experiments, we’ve found that the “best” learning rate varies with both model family, size and the use of packing. Since a high learning rate can lead to exploding gradients, we find it’s often safer to slightly decrease the learning rate when packing is enabled. You can see this below, where using a small learning rate of 3e-6 or 1e-5 gives better overall performance than large values:
 
 Although a few points on average may not seem like much, if you look at individual benchmarks like AIME25, you’ll see the performance drop dramatically when the learning rate is larger than 1e-5.
-
-**Scaling the number of epochs**
-
+#### Scaling the number of epochs
 In our ablations, we usually train for a single epoch to iterate quickly. Once you’ve identified a good data mixture and tuned key parameters like the learning rate, the next step is to increase the number of epochs for final training.
 
 For example, if we take our baseline data mixture and train for five epochs, we see it is possible to squeeze a few more percentage points of performance on average:
@@ -2618,9 +2521,7 @@ These results prompted us to try a similar approach. From our prior experience w
 Since we planned to include reasoning data in the final SFT mix, we decided to keep Mixture of Thoughts for that stage the others for mid-training. We used ChatML as the chat template to avoid “burning in” the SmolLM3 one too early on. We also trained for 5 epochs with a learning rate of 2e-5, using 8 nodes to accelerate training with an effective batch size of 128.
 
 You might wonder why we’re discussing mid-training _after_ we did some SFT runs. Chronologically, mid-training happens before SFT on the base model. But the decision to do mid-training only becomes clear after you’ve run initial SFT experiments and identified performance gaps. In practice, you’ll often iterate: run SFT to identify weak areas, then do targeted mid-training, then run SFT again. Think of this section as **“what to do when SFT alone isn’t enough.”**
-
-**The mystery of the melting GPUs**
-
+#### The mystery of the melting GPUs
 Running these experiments turned out to be a surprising challenge on our cluster: the aging GPUs would get throttled at various points which would lead to hardware failures and forced restarts of each run. To give you a taste of what it was like, here’s the logs from one of the runs, where each colour represents a restart:
 
 ![Image 13: Image](https://huggingfacetb-smol-training-playbook.hf.space/_astro/GtU8DnoWsAAruEG_28e1384e-bcac-8051-8122-ed6cacf8f632.AUNwy38i_Z1Unntg.webp)
@@ -2660,9 +2561,7 @@ Let’s take a look at how these datasets are created.
 #### [Creating preference datasets](https://huggingfacetb-smol-training-playbook.hf.space/#creating-preference-datasets)
 
 Historically, preference datasets were created by providing human annotators with pairs of model responses and asking them to grade which one is better (possibly on a scale). This approach is still used by LLM providers to collect _human preference_ labels, but it is extremely expensive and scales poorly. Recently, LLMs have become capable of producing high-quality responses, and often in a cost-effective way. These advances make it practical for LLMs to _generate_ preferences for many applications. In practice, there are two common approaches:
-
-**Strong vs. weak**
-
+#### Strong vs. weak
 1.   Take a fixed set of prompts x x (often curated for coverage and difficulty).
 2.   Generate one response from a weaker or baseline model, and another from a high-performing model.
 3.   Label the stronger model’s output as the chosen response y c y_c and the weaker one as rejected y r y_r .
@@ -2670,9 +2569,7 @@ Historically, preference datasets were created by providing human annotators wit
 This produces a dataset of “stronger vs. weaker” comparisons ({x,y c,y r})(\lbrace{x,y_c,y_r\rbrace}) , which is simple to construct because we assume the stronger model’s output is reliably better.
 
 Below is a popular example from Intel, who took an SFT dataset with responses from gpt-3.5 and gpt-4 and converted it into a preference dataset by selecting the gpt-4 responses as chosen and the gpt-3.5 ones as rejected:
-
-**On-policy with grading**
-
+#### On-policy with grading
 1.   Use the _same model_ you will train to generate multiple candidate responses to the same prompt. This creates data that is “on-policy” because it reflects the distribution of outputs the model would naturally produce.
 2.   Instead of relying on a stronger model as the reference, introduce an _external grader:_ either a verifier or a reward model that scores responses along one or more quality axes (e.g., helpfulness or factual accuracy).
 3.   The grader then assigns preference labels among the candidate responses, producing a more nuanced and flexible preference dataset.
@@ -2716,9 +2613,7 @@ For preference optimisation, there are typically only three hyperparameters that
 *   The batch size.
 
 Let’s take a look at how these played out for SmolLM3, starting from the [SFT checkpoint](https://huggingface.co/HuggingFaceTB/SmolLM3-3B-checkpoints/tree/it-SFT) we trained over the whole of `smoltalk2` .
-
-**Use small learning rates for best performance**
-
+#### Use small learning rates for best performance
 The first ablation we ran was to check the influence of the learning rate on model performance. We ran experiments to determine the influence of learning rates between ~200x smaller (1e-7) and ~2x smaller (1e-5) than the SFT learning rate (2e-5). Previous projects like Zephyr 7B had taught us that the best learning rate for preference optimisation methods is around 10x smaller than the one used for SFT, and the ablations we ran for SmolLM3 confirmed this rule of thumb.
 
 As shown in the figure below, learning rates ~10x smaller improve the performance of the SFT model in both reasoning modes, but all learning rates beyond that 10x limit result in worse performance for the extended thinking mode:
@@ -2726,19 +2621,13 @@ As shown in the figure below, learning rates ~10x smaller improve the performanc
 The trend for the `/no_think` reasoning mode is more stable, with the best learning rate at 5e-6. This is mostly driven by a single benchmark (LiveCodeBench v4), so we opted for 1e-6 in our SmolLM3 runs.
 
 Our recommendation for your training runs is to run scans of your learning rate at a range of 5x to 20x smaller than your SFT learning rate. It is highly likely that you will find your optimal performance within that range!
-
-**Tune your β**
-
+#### Tune your β
 The experiments we ran for the ß parameter ranged from 0.01 to 0.99 to explore values that encourage different degrees of alignment to the reference model. As a reminder, lower values of beta encourage staying close to the reference model while higher values allow the model to match the preference data more closely. The model performance for β=0.1 is the highest for both reasoning modes and improves compared to the metrics from the SFT checkpoint. Using a low beta value hurts model performance and results in a worse model than the SFT checkpoint, while performance remains stable across multiple ß values without extended thinking.
 
 These results suggest that values greater than 0.1 are preferable for preference optimisation, and that aligning the model with the preference data is more beneficial than staying close to the reference model. However, we suggest exploring ß values in the range 0.01 and 0.5. Higher values may erase capabilities from the SFT checkpoint that we might not be capturing in the evals shown on the plot.
-
-**Scaling the preference data**
-
+#### Scaling the preference data
 We also ran experiments to determine how dataset size influences results, testing values from 2k to 340k preference pairs. Across this range, performance remained stable. Performance drops in the extended thinking mode occur for datasets beyond 100k preference pairs, but the drop is not as pronounced as we saw with different learning rate values. The dataset we used for the SmolLM3 training run was 169k preference pairs, but the results show that smaller datasets also show improvements over the SFT checkpoint. For future projects, we know we can experiment with smaller datasets during the iteration phase, as it is important to try multiple ideas and quickly identify the most promising configurations.
-
-**Bringing it all together**
-
+#### Bringing it all together
 Bringing all these threads together produced the final SmolLM3-3B model: best-in-class for its size and sat on the Pareto front with Qwen’s own hybrid reasoning models.
 
 Not too shabby for a few weeks work!
@@ -2819,12 +2708,10 @@ But first, the initial position: the jogger is 340 meters ahead of the engine. S
 
 Hmm, so the jogger is 340 m ahead of the engine along the track. Since they're moving in the same direction, the train is behind the jogger by 340 meters. To pass the jogger, the train has to cover that 340 meters plus the length of the train itself?
 ```
-
-**Mitigating reward hacking with overlong penalties**
-
+#### Mitigating reward hacking with overlong penalties
 This issue can mitigated by including an _overlong completion penalty_ , that penalises completions over a certain length. The penalty is parameterised by two arguments max completion length L m a x L_{max} and soft punishment cache L c a c h e L_{cache} . This penalty was one of the improvements proposed in the DAPO paper ([Yu et al., 2025](https://arxiv.org/abs/2503.14476)) and amounts to applying a reward function as follows:
 
-R length(y)={0,∣y∣≤L max−L cache(L max−L cache−∣y∣)L cache,L max−L cache<∣y∣≤L max−1,L max<∣y∣ R_{\text{length}}(y) = \begin{cases} 0, & |y| \le L_{\text{max}} - L_{\text{cache}} \\ \frac{(L_{\text{max}} - L_{\text{cache}} - |y|)}{L_{\text{cache}}}, & L_{\text{max}} - L_{\text{cache}} < |y| \le L_{\text{max}} \\ -1, & L_{\text{max}} < |y| \end{cases} 
+R length(y)={0,∣y∣≤L max−L cache(L max−L cache−∣y∣)L cache,L max−L cache<∣y∣≤L max−1,L max<∣y∣ R_{\text{length}}(y) = \begin{cases} 0, & |y| \le L_{\text{max}} - L_{\text{cache}} \\ \frac{(L_{\text{max}} - L_{\text{cache}} - |y|)}{L_{\text{cache}}}, & L_{\text{max}} - L_{\text{cache}} < |y| \le L_{\text{max}} \\ -1, & L_{\text{max}} < |y| \end{cases}
 Using this penalty, we can directly control the model’s output distribution and measure the tradeoff between increasing response length and performance. An example is shown in the figure below, where we vary the overlong penalty from 1.5k to 4k in steps of 512 tokens:
 
 Applying an overlong penalty constrains the length of each rollout, while also reducing the average reward.
@@ -2834,9 +2721,7 @@ The tradeoff between response length and performance is clearer when we examine 
 Downstream performance of Smollm3 with RLVR on AIME25.
 
 Now we can clearly see how the overlong penalty impacts downstream performance, with penalties in the range 2-4k producing significant improvements, while keeping the token distribution in check. As shown in the figure below, if we take the checkpoints from step 400, we can compare the output token distributions between the initial policy and final model across a range of different penalties:
-
-**Bringing it all together**
-
+#### Bringing it all together
 We find that applying a length penalty in the range 2.5-3k gives the best tradeoff between performance and response length, with the figure below showing that GRPO nearly doubles the performance on AIME 2025 over offline methods like APO:
 
 Now that we know how to improve performance in the `/no_think` reasoning mode, the next step in the RL training pipeline would be _joint training_ of the model in both reasoning modes at once. However, we have found this to be quite a tough nut to crack because each mode requires it’s own length penalty and the interplay has thus far produced unstable training. This highlights the main challenge with trying to apply RL on hybrid reasoning models, and we can see this reflected in a new trend from model developers like Qwen to release the [instruct](https://huggingface.co/Qwen/Qwen3-4B-Instruct-2507) and [reasoning](https://huggingface.co/Qwen/Qwen3-4B-Thinking-2507) variants separately.
@@ -2864,6 +2749,7 @@ Although there are a gazillion research papers about which on-policy method is �
 
 In the open-source ecosystem, reinforcement learning methods like GRPO and REINFORCE tend to be the most widely used, although the Qwen3 tech report ([A. Yang, Li, et al., 2025](https://arxiv.org/abs/2505.09388)) highlighted the use of on-policy distillation to train the models under 32B parameters:
 
+```mermaid
 flowchart LR
     subgraph Flagship ["Flagship Models"]
         Base1["Base Models"] --> Stage1["Stage 1:
@@ -2882,7 +2768,7 @@ General RL"]
 
 Qwen3-32B"]
     end
-    
+
     subgraph Lightweight ["Lightweight Models"]
         Base2["Base Models"] --> Distillation["Strong-to-Weak
 
@@ -2892,14 +2778,15 @@ Distillation"]
 
 14B/8B/4B/1.7B/0.6B"]
     end
-    
+
     classDef flagshipStage fill:#ffd0c5
     classDef lightweightStage fill:#fef3c7
     classDef output fill:#f8d7da
-    
+
     class Stage1,Stage2,Stage3,Stage4 flagshipStage
     class Distillation lightweightStage
     class FlagshipOut,LightweightOut output
+```
 
 One interesting property of on-policy distillation with small models is that it typically outperforms RL-based methods at a fraction of the compute cost. This is because instead of generating multiple rollouts per prompt, we only sample one, which is then graded by the teacher in a single forward-backward pass. As the Qwen3 tech report shows, the gains over GRPO can be significant:
 
@@ -3104,9 +2991,7 @@ Flash Attention achieves its 2-4× speedup by **fusing these operations** and ke
 *   Only the final output is written back to HBM
 
 **The result**: Flash Attention reduces HBM accesses from O(N²) to O(N), transforming a memory-bound operation into one that better utilizes the GPU’s compute capabilities. This is the essence of efficient kernel design: _minimize slow memory movement, maximize fast computation_ .
-
-**Example: Validating our HBM3 Bandwidth in Practice**
-
+#### Example: Validating our HBM3 Bandwidth in Practice
 Now that we understand the memory hierarchy, let’s put theory into practice and validate the actual bandwidth on our H100 GPUs! This is where benchmarking tools become essential.
 
 **NVBandwidth** is NVIDIA’s open-source benchmarking tool designed specifically for measuring bandwidth and latency across GPU systems. It evaluates data transfer rates for various memory copy patterns—host-to-device, device-to-host, and device-to-device operations—using both copy engines and kernel-based methods. The tool is particularly valuable for assessing inter-GPU communication (for example [NVLink](https://en.wikipedia.org/wiki/NVLink) and [PCIe](https://fr.wikipedia.org/wiki/PCI_Express), two types of connectors) and validating system performance in multi-GPU environments.
@@ -3308,9 +3193,7 @@ NVIDIA’s Grace Hopper superchips take a fundamentally different approach to CP
 *   **NVLink Switch System** providing 9x higher GPU-GPU link bandwidth than InfiniBand NDR400 NICs connected via PCIe Gen4
 
 For more details, see the [NVIDIA Grace Hopper Superchip Architecture Whitepaper](https://download.deltacomputer.com/NVIDIA%20Grace%20Hopper%20Superchip%20Architecture%20Whitepaper.pdf) (page 11).
-
-**⚠️NUMA Affinity: Critical for Multi-Socket Performance**
-
+#### ⚠️NUMA Affinity: Critical for Multi-Socket Performance
 On multi-socket systems like our AMD EPYC 7R13 nodes (2 sockets, 48 cores each), **** **NUMA affinity**is crucial for GPU performance** . It refers to running processes on CPU cores that share the same socket as their target devices (like GPUs). When your GPU process runs on CPUs from a different NUMA node than where the GPU is attached, operations must traverse the CPU interconnect (AMD Infinity Fabric), adding significant latency and bandwidth constraints.
 
 **First, let’s examine the NUMA topology and node distances to understand the performance implications** :
@@ -3318,8 +3201,8 @@ On multi-socket systems like our AMD EPYC 7R13 nodes (2 sockets, 48 cores each),
 ```
 $ numactl --hardware
 node distances:
-node   0   1 
-  0:  10  32 
+node   0   1
+  0:  10  32
   1:  32  10
 ```
 
@@ -3529,21 +3412,17 @@ GB/s
 Internode GPU-to-GPU communication path through Libfabric EFA
 
 As illustrated above, when GPUs and network cards are connected to the same PCIe switch, **GPUDirect RDMA** enables their communication to occur solely through that switch. This setup allows for full utilization of the PCIe Gen5 x16 bandwidth and avoids involving other PCIe switches or the CPU memory bus. Theoretically, 8 PCIe Switches per node x 4 EFA NICs per switch x 100 Gbps each EFA NIC gives **3200 Gbps**(400GB/s)** of bandwidth which is the bandwidth we find in [AWS p5’s specs).](https://aws.amazon.com/ec2/instance-types/p5/) So how does it hold in practice? Let’s find out by running the same benchmarks as before but across different nodes!
-
-**Bandwidth Analysis**
-
+#### Bandwidth Analysis
 Point-to-point send/receive operations achieve around **42-43 GB/s** for 2-4 nodes but drop to approximately 21 GB/s for 5+ nodes. This performance degradation occurs because NCCL automatically reduces the number of point-to-point channels per peer from 2 to 1 when scaling beyond 4 nodes, effectively halving the available bandwidth utilization, while theoretical maximum remains ~50 GB/s (4 EFA NICs × 12.5 GB/s each). We successfully managed to restore the full throughput for this test on 5+ nodes by setting `NCCL_NCHANNELS_PER_NET_PEER=2` , though this flag should be used with caution as it may degrade all-to-all performance for example (see [GitHub issue #1272](https://github.com/NVIDIA/nccl/issues/1272) for details).
 
 The all-reduce operation demonstrates excellent performance within a single node, achieving **480 GB/s** of bus bandwidth. When scaling to 2 nodes, bandwidth remains nearly identical at 479 GB/s, after which it stabilizes at around 320-350 GB/s for 3-16 nodes. This pattern reveals an important characteristic: while there’s an initial drop when crossing node boundaries due to the transition from NVLink to the inter-node network fabric, _the bandwidth then scales almost constantly as we add more nodes._
 
 This near-constant scaling behavior beyond 2 nodes is actually quite encouraging for large-scale training. The relatively stable 320-350 GB/s across 3-16 nodes suggests that parallelism strategies relying on all-reduce operations (for example, in data parallelism) can scale to hundreds or even thousands of GPUs without significant per-GPU bandwidth degradation. This logarithmic scaling characteristic is typical of well-designed multi-tier network topologies using 8-rail optimized fat trees, where each of the 8 GPUs connects to a separate switch rail to maximize bisection bandwidth. Modern frontier training clusters routinely operate at 100,000+ GPUs, and this stable scaling behavior is what makes such massive deployments feasible.
 
-When working with different bandwidth links (NVLink within nodes vs. inter-node network), consider adapting your parallelism strategy to each bandwidth tier to fully utilize all available bandwidths. See the [Ultrascale playbook](https://huggingfacetb-smol-training-playbook.hf.space/[https://huggingface.co/spaces/nanotron/ultrascale-playbook](https://huggingface.co/spaces/nanotron/ultrascale-playbook)) for detailed guidance on optimizing parallelism configurations for heterogeneous network topologies.
+When working with different bandwidth links (NVLink within nodes vs. inter-node network), consider adapting your parallelism strategy to each bandwidth tier to fully utilize all available bandwidths. See the [Ultrascale playbook](https://huggingface.co/spaces/nanotron/ultrascale-playbook) for detailed guidance on optimizing parallelism configurations for heterogeneous network topologies.
 
 The all-to-all operation shows more dramatic scaling challenges: starting at 344 GB/s for a single node, bandwidth drops to 81 GB/s at 2 nodes and continues declining to approximately 45-58 GB/s for larger clusters. This steeper degradation reflects the all-to-all pattern’s intensive network demands, where each GPU must communicate with every other GPU across nodes, creating significantly more network congestion than all-reduce operations.
-
-**Latency Analysis**
-
+#### Latency Analysis
 **Latency** measurements reveal the fundamental cost of crossing node boundaries. Send/receive operations maintain relatively stable latencies of **40-53 μs** across all multi-node configurations, demonstrating that point-to-point communication latency is primarily determined by the base network round-trip time rather than cluster size, though some variation suggests network topology and routing effects still play a role.
 
 All-reduce operations show minimal latency of **12.9 μs** within a single node, but this jumps to **55.5 μs** for 2 nodes and continues increasing nearly linearly with cluster size, reaching **235 μs** at 16 nodes. This progression reflects both the increased communication distance and the growing complexity of the reduction tree across more nodes.
@@ -3565,21 +3444,16 @@ When bandwidth measurements fall short of expectations, several factors could be
 #### [Troubleshooting Interconnect](https://huggingfacetb-smol-training-playbook.hf.space/#troubleshooting-interconnect)
 
 If you’re experiencing lower than expected bandwidth, systematically check the following areas:
-
-**Library Versions**
-
+#### Library Versions
 Outdated NCCL, EFA, or CUDA libraries may lack critical performance optimizations or bug fixes. Always verify you’re running recent, compatible versions of all communication libraries. e.g. AWS regularly updates their Deep Learning AMIs with optimized library versions for their hardware. It’s also recommended to log these library versions for important experiments.
-
-**CPU Affinity Configuration**
-
+#### CPU Affinity Configuration
 Improper CPU affinity settings can significantly impact NCCL performance by causing unnecessary cross-NUMA traffic. Each GPU should be bound to CPUs on the same NUMA node to minimize memory access latency. In practice, [this Github issue](https://github.com/NVIDIA/nccl/issues/1017#issuecomment-1751385723) demonstrates how using `NCCL_IGNORE_CPU_AFFINITY=1` and `--cpu-bind none` helped reduce container latency significantly. [You can read more about it here.](https://enterprise-support.nvidia.com/s/article/understanding-numa-node-for-performance-benchmarks#Mapping-between-PCI-device-driver-port-and-NUMA)
-
-**Network Topology and Placement**
-
+#### Network Topology and Placement
 Understanding your network topology is crucial for diagnosing performance issues. Cloud placement groups, while helpful, don’t guarantee minimal network hops between instances. In modern datacenter fat-tree topologies, instances placed under different top-level switches will experience higher latency and potentially lower bandwidth due to additional network hops in the routing path.
 
 For **AWS EC2** users, the [Instance Topology API](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/how-ec2-instance-topology-works.html) provides valuable visibility into network node placement. Instances sharing t”he same network node at the bottom layer (directly connected to the instance) are physically closest and will achieve the lowest latency communication.
 
+```mermaid
 graph TD
     %% Single Level 1 node
     L1["Level 1
@@ -3744,19 +3618,16 @@ p5.48xlarge"]:::level4
     classDef level2 fill:#e1f5fe
     classDef level3 fill:#fff9c4
     classDef level4 fill:#ffcdd2
+```
 
 Network topology visualization showing instance placement.
 
 Minimizing network hops between communicating nodes directly translates to better interconnect performance. For small-scale experiments and ablations, ensuring your instances are co-located on the same network switch can make a measurable difference in both latency and bandwidth utilization.
-
-**Correct Environment Variables**
-
+#### Correct Environment Variables
 Missing or incorrect environment variables for your network adapter can severely limit bandwidth utilization. Communication libraries like NCCL rely on specific configuration flags to enable optimal performance features such as adaptive routing, GPU-initiated transfers, and proper buffer sizing.
 
 For example, when using AWS EFA (Elastic Fabric Adapter), ensure you’re setting the recommended NCCL and EFA environment variables for your instance type. The [AWS EFA cheatsheet](https://github.com/aws-samples/awsome-distributed-training/blob/main/1.architectures/efa-cheatsheet.md) provides comprehensive guidance on optimal flag configurations for different scenarios.
-
-**Container-specific Considerations**
-
+#### Container-specific Considerations
 When using containers (Docker/Enroot), several configuration steps are critical for optimal NCCL performance:
 
 *   **Shared and Pinned Memory** : Docker containers default to limited shared and pinned memory resources. Launch containers with `-shm-size=1g --ulimit memlock=-1` to prevent initialization failures.
@@ -3772,9 +3643,7 @@ Now that you know how to debug bottlenecks in GPU-CPU and GPU-GPU communication 
 The connection between GPUs and storage systems is often overlooked but can significantly impact training efficiency. During training, GPUs need to continuously read data from storage (data loading, especially for multimodal data with large image/video files) and periodically write model states back to storage (aka checkpointing). For modern large-scale training runs, these I/O operations can become bottlenecks if not properly optimized.
 
 **TL;DR:** GPU-storage I/O impacts training through data loading and checkpointing. GPUDirect Storage (GDS) enables direct GPU-to-storage transfers, bypassing CPU for better performance. Even without GDS enabled in our cluster, local NVMe RAID (8×3.5TB drives in RAID 0) delivers 26.59 GiB/s and 337K IOPS (6.3x faster than network storage), making it ideal for checkpoints.
-
-**Understanding Storage Topology**
-
+#### Understanding Storage Topology
 The physical connection between GPUs and storage devices follows a similar hierarchical structure to GPU interconnects. Storage devices connect through PCIe bridges, and understanding this topology helps explain performance characteristics and potential bottlenecks.
 
 Looking at the system topology from `lstopo` , we can see how NVMe drives connect to the system. In our p5 instance, we have 1 NVMe SSD per GPU:
@@ -3796,7 +3665,7 @@ $ /usr/local/cuda/gds/tools/gdscheck.py -p
  =====================
  DRIVER CONFIGURATION:
  =====================
- NVMe               : Supported   
+ NVMe               : Supported
  NVMeOF             : Unsupported
  SCSI               : Unsupported
  ScaleFlux CSD      : Unsupported
@@ -3815,9 +3684,7 @@ $ /usr/local/cuda/gds/tools/gdscheck.py -p
 ```
 
 We see `NVMe: Supported` which informs that GDS is currently configured to work for NVMe drives, and all other storage types are not properly configured as apparent from the Unsupported flag. If GDS is not properly configured for your storage type, refer to the [NVIDIA GPUDirect Storage Configuration Guide](https://docs.nvidia.com/gpudirect-storage/configuration-guide/index.html) for instructions on modifying the configuration file at `/etc/cufile.json` .
-
-**Block Storage Devices**
-
+#### Block Storage Devices
 To understand the storage devices available on your system, you can use `lsblk` to display the block device hierarchy:
 
 ```
@@ -3844,9 +3711,7 @@ This output shows the block device hierarchy on the system. The key observations
 *   The RAID array is exposed as `/dev/md0` , formatted with XFS, and mounted at `/scratch` with 28TB available (8x3.5TB)
 
 The arrows (┈▶) indicate that multiple NVMe devices are members of the same RAID array, which then combines into the single `md0` device.
-
-**Network Storage**
-
+#### Network Storage
 In addition to local NVMe storage, the system has access to network-attached storage systems:
 
 ```
@@ -3874,9 +3739,7 @@ The local NVMe RAID array ( `/scratch` ) provides the fastest I/O performance, w
 **WekaFS**: A high-performance parallel file system designed for AI/ML workloads, providing low-latency access and high throughput across multiple nodes.
 
 **FSx Lustre**: A parallel file system designed for HPC that separates metadata and data services across different servers to enable parallel access. While effective for large files, it can struggle with metadata-intensive AI/ML workloads involving many small files.
-
-**Benchmarking Storage Bandwidth**
-
+#### Benchmarking Storage Bandwidth
 To understand the performance characteristics of each storage system, we can benchmark their read/write speeds using GPUDirect Storage (GDS). Here’s a comprehensive parametric benchmark script that tests various configurations:
 
 ```
@@ -4012,9 +3875,7 @@ Successfully ran diagnostic for group.
 **Continuous monitoring:** During training, we tracked key metrics across all nodes such as GPU temperatures, memory usage, compute utilization and throughput fluctuations. We use [Prometheus](https://prometheus.io/) to collect [DCGM](https://github.com/NVIDIA/DCGM) metrics from all GPUs and visualize them in [Grafana](https://grafana.com/) dashboards for real-time monitoring. For detailed setup instructions on deploying Prometheus and Grafana for GPU monitoring on AWS infrastructure, see [this example setup guide](https://github.com/aws-samples/awsome-distributed-training/tree/3ae961d022399021cc4053c3ba19b182ca6b8dc8/4.validation_and_observability/4.prometheus-grafana). A Slack bot alerted us when any node showed suspicious behavior, allowing us to proactively replace failing hardware before it crashed the entire training run.
 
 [Access to dashboard](https://huggingfacetb-smol-training-playbook.hf.space/screencapture-grafana-huggingface.pdf) This multi-layered approach meant hardware issues became manageable interruptions.
-
-**Thermal Reality Check: When GPUs Slow Down**
-
+#### Thermal Reality Check: When GPUs Slow Down
 Marketing specs assume perfect cooling, but reality is messier. GPUs automatically reduce clock speeds when they overheat, cutting performance below theoretical maximums even in well-designed systems.
 
 ![Image 21: Image](https://huggingfacetb-smol-training-playbook.hf.space/_astro/image_27d1384e-bcac-80b1-9ffb-ec29d0021ccc.D54wWyJ9_2jmnNO.webp)
@@ -4041,9 +3902,7 @@ There’s two important details to keep in mind when implementing your resume me
 
 *   Checkpoint saving should happen in the background without impacting training throughput.
 *   Watch your storage, over a 24-day run, saving every 4 hours means ~144 checkpoints. With large models and optimizer states, this adds up fast. In our case, we store only one local checkpoint (the latest saved) at a time and offload the rest to S3 to avoid filling up cluster storage.
-
-**A painful lesson from the past:**
-
+#### A painful lesson from the past:
 During our first large-scale run (StarCoder 15B), training proceeded smoothly through multiple restarts. On the final day, we discovered the entire checkpoint folder had been deleted by a leftover `rm -rf $CHECKPOINT_PATH` command at the very end of the script from old throughput tests. This destructive command only triggered when the Slurm job actually finished, which hadn’t happened in previous restarts.
 
 Luckily, we had the checkpoint from the day before saved, so it only cost us one day of retraining. The takeaways were clear: never leave destructive commands in production scripts, and automate checkpoint backups immediately after saving rather than relying on manual intervention.
@@ -4067,9 +3926,7 @@ Finally, lets have a look at how we can optimize the training layout, ie how the
 Great question! After all this talk about specs and benchmarks, you still need to figure out the practical question: how many GPUs should you actually rent or buy?
 
 Determining the right number of GPUs requires balancing training time, cost, and scaling efficiency. Here’s the framework we used:
-
-**Basic Sizing Formula:**
-
+#### Basic Sizing Formula:
 GPU Count=Total FLOPs Required Per-GPU Throughput×Target Training Time\text{GPU Count} = \frac{\text{Total FLOPs Required}}{\text{Per-GPU Throughput} \times \text{Target Training Time}}
 This formula breaks down the problem into three key components:
 
@@ -4096,9 +3953,7 @@ Now plugging into our sizing formula:
 
 GPU Count=1.98×10 23 FLOPs 216×10 12 FLOPs/sec×4 weeks×604,800 sec/week\text{GPU Count} = \frac{1.98 \times 10^{23} \text{ FLOPs}}{216 \times 10^{12} \text{ FLOPs/sec} \times 4 \text{ weeks} \times 604,800 \text{ sec/week}}=1.98×10 23 5.23×10 20≈379 GPUs= \frac{1.98 \times 10^{23}}{5.23 \times 10^{20}} \approx 379 \text{ GPUs}
 This calculation pointed us toward 375-400 H100s, and we secured 384 H100s, a number that aligned well with our parallelism strategy and gave us a realistic 4-week timeline with some buffer for unexpected issues like node failures and restarts.
-
-**Why More GPUs Isn’t Always Better: Amdahl’s Law in Action**
-
+#### Why More GPUs Isn’t Always Better: Amdahl’s Law in Action
 Here’s a counterintuitive truth:**adding more GPUs can actually make your training slower** . This is where [Amdahl’s Law](https://en.wikipedia.org/wiki/Amdahl%27s_law) comes into play.
 
 Amdahl’s Law states that the speedup from parallelization is fundamentally limited by the serial (non-parallelizable) portion of your workload. In LLM training, this “serial” portion is primarily**communication overhead:** the time spent synchronizing gradients/weights/activations across GPUs that can’t be parallelized away (read more[here](https://acenet-arc.github.io/ACENET_Summer_School_General/05-performance/index.html)).
@@ -4186,9 +4041,7 @@ We started this journey with a simple question: what does it actually take to tr
 **Post-training in practice.** We showed that going from a base model to a production assistant requires its own systematic approach: establishing evals before training anything, iterating on SFT data mixtures, applying preference optimization, and optionally pushing further with RL. You’ve seen how vibe testing catches bugs that metrics miss, how chat templates can silently break instruction-following, and why data mixture balance matters as much in post-training as it does in pretraining.
 
 Throughout both phases, we kept coming back to the same core insights: validate everything through experiments, change one thing at a time, expect scale to break things in new ways, and let your use case drive decisions rather than chasing every new paper. Following this process, we trained SmolLM3: a competitive 3B multilingual reasoner with long context. Along the way, we learned a lot about what works, what breaks, and how to debug when things go wrong. We’ve tried to document it all, the successes and failures alike.
-
-**What’s next?**
-
+#### What’s next?
 This blog covers the fundamentals of modern LLM training, but the field evolves rapidly. Here are ways to go deeper:
 
 *   **Run experiments yourself.** Reading about ablations is useful; running your own teaches you what actually matters. Pick a small model, set up evals, and start experimenting.

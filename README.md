@@ -1,8 +1,7 @@
 # Smol 训练手册：打造世界级 LLM 的秘诀 (中文版)
 
-URL 来源：https://huggingfacetb-smol-training-playbook.hf.space/
-
-发布时间：2025 年 10 月 30 日
+- 来源：[原文](https://huggingfacetb-smol-training-playbook.hf.space/)
+- 发布时间：2025 年 10 月 30 日
 
 
 [引言](https://huggingfacetb-smol-training-playbook.hf.space/#introduction)
@@ -75,7 +74,7 @@ URL 来源：https://huggingfacetb-smol-training-playbook.hf.space/
 
 第一，领域特异性（domain specificity）： 当数据或任务包含高度专业化的词汇或结构，而现有模型难以胜任时。例如：
 
-*   DNA 模型需要独特的词表并捕捉长程依赖。  
+*   DNA 模型需要独特的词表并捕捉长程依赖。
 *   法律或金融模型必须深谙行业术语与逻辑。
 
 第二，部署约束（deployment constraints）： 需要针对自有硬件、延迟或隐私要求定制模型。例如，在无人机或本地部署系统上运行 LLM，且硬件为 FPGA 等定制芯片。
@@ -120,9 +119,9 @@ Bloom 的继任者是 2022 年的 StarCoder（[Li et al., 2023](https://arxiv.or
 
 既然你已经明确了为什么要训练，那么应该训练什么？这里的“什么”指的是：模型类型（dense（稠密）、MoE（混合专家）、hybrid（混合）、还是全新架构）、模型规模、架构细节以及数据混合比例。一旦确定了“为什么”，就可以推导出“什么”。例如：
 
-*   用于设备端的快速模型 → 小型高效模型  
-*   多语言模型 → 大词表分词器（tokenizer）  
-*   超长上下文 → 混合（hybrid）架构  
+*   用于设备端的快速模型 → 小型高效模型
+*   多语言模型 → 大词表分词器（tokenizer）
+*   超长上下文 → 混合（hybrid）架构
 
 除了受用例驱动的决策外，还有一些选择可以优化训练本身，使其更稳定、样本效率更高或速度更快。这些决策并不总是非黑即白，但你可以大致把决策过程分成两个阶段：
 
@@ -157,7 +156,7 @@ Bloom 的继任者是 2022 年的 StarCoder（[Li et al., 2023](https://arxiv.or
 
 既然这些实验将指导许多关键决策，好好设计它们就格外重要。我们主要希望实验具备两项核心属性：
 
-1.  速度（Speed）： 它们应尽可能快地运行，以便我们能频繁迭代。能跑的消融（ablation）越多，能验证的假设就越多。  
+1.  速度（Speed）： 它们应尽可能快地运行，以便我们能频繁迭代。能跑的消融（ablation）越多，能验证的假设就越多。
 2.  可靠性（Reliability）： 它们应具备强判别力。如果我们关注的指标在早期无法有意义地区分不同配置，消融就可能收效甚微（如果指标噪声大，我们还会陷入“追噪声”的风险！）。更多细节请参阅 [FineTaks 博客文章](https://huggingface.co/spaces/HuggingFaceFW/blogpost-fine-tasks)。
 
 但在搭建消融实验之前，我们必须先对架构类型（architecture type）和模型规模（model size）做出基础性选择。这些由“指南针”指引的决策，会影响使用哪种训练框架、如何分配算力预算，以及从哪个基线（baseline）出发。
@@ -295,7 +294,7 @@ model:
     hidden_size: 2048
     num_hidden_layers: 16
     num_attention_heads: 32
-    num_key_value_heads: 8  
+    num_key_value_heads: 8
     intermediate_size: 8192
     max_position_embeddings: 4096
     rope_theta: 50000.0
@@ -322,7 +321,7 @@ optimizer:
 parallelism:
   dp: 8  # 在 8 张 GPU 上做数据并行（Data parallel）
   tp: 1  # 1B 规模无需张量或流水线并行
-  pp: 1 
+  pp: 1
 
 ## 分词器（Tokenizer）
 tokenizer:
@@ -368,7 +367,7 @@ def count_parameters(
         max_position_embeddings=sequence_length,
         tie_word_embeddings=tie_embeddings,
     )
-    model = LlamaForCausalLM(config)  
+    model = LlamaForCausalLM(config)
     return f"{sum(p.numel() for p in model.parameters())/1e9:.2f}B"
 ```
 
@@ -569,7 +568,7 @@ Ablation - GQA beats MHA（消融实验 - GQA 优于 MHA）
 
 ```
 File 1: "Recipe for granola bars..." (400 tokens) <EOS>
-File 2: "def hello_world()..." (300 tokens) <EOS>  
+File 2: "def hello_world()..." (300 tokens) <EOS>
 File 3: "Climate change impacts..." (1000 tokens) <EOS>
 File 4: "import numpy as np..." (3000 tokens) <EOS>
 ...
@@ -673,7 +672,7 @@ def apply_rope_simplified(x, pos, dim=64, base=10000):
     - Each pair of vector dimensions has an index k (0 .. dim/2 - 1).
     - RoPE rotates every pair [x[2k], x[2k+1]] by an angle θ_{p,k}.
 
-    
+
     Formula:
       θ_{p,k} = p * base^(-k / (dim/2))
 
@@ -714,10 +713,10 @@ attn_weights = torch.softmax(scores, dim=-1)
 这段代码看起来可能比较复杂，所以我们用一个具体例子来拆解。考虑句子 _“The quick brown fox”_ 中的单词 _“fox”_。在我们的基线 1B 模型中，每个注意力头（attention head）处理的是 64 维的 query/key 向量。RoPE（Rotary Position Embedding，旋转位置编码）会把该向量拆成 32 对：(x₁, x₂)、(x₃, x₄)、(x₅, x₆)……之所以按“对”处理，是因为我们在二维空间里做旋转。为简单起见，只看第一对 (x₁, x₂)。单词 “fox” 在句中处于第 3 个位置，因此 RoPE 会把这对维度旋转：
 
 $$
-\text{rotation\_angle} = \text{position} \times \theta₀ 
+\text{rotation\_angle} = \text{position} \times \theta₀
                         = 3 \times \left(\frac{1}{10000^{0/32}}\right)
-                        = 3 \times 1.0 
-                        = 3.0 \text{ 弧度} 
+                        = 3 \times 1.0
+                        = 3.0 \text{ 弧度}
                         = 172°
 $$
 
@@ -767,7 +766,7 @@ RNoPE 混合方案： 鉴于上述权衡，[B. Yang et al. (2025)](https://arxiv
 
 损失与评估结果显示，三种配置的性能相近，表明 NoPE（No Position Embedding，无位置编码） 在保持强劲短上下文能力的同时，也为更好的长上下文处理奠定了基础。基于这些结果，我们在 SmolLM3 中采用了 NoPE + 文档掩码（document masking） 的组合。
 
-部分/分块 RoPE（Partial/Fractional RoPE）：  
+部分/分块 RoPE（Partial/Fractional RoPE）：
 另一种互补思路是只对模型维度的一个子集应用 RoPE。与 RNoPE（Remove NoPE） 在整层之间交替使用 RoPE 和 NoPE 不同，Partial RoPE 在同一层内混合二者。近期模型如 GLM-4.5（[5 Team et al., 2025](https://arxiv.org/abs/2508.06471)）或 Minimax-01（[MiniMax et al., 2025](https://arxiv.org/abs/2501.08313)）采用了这一策略，但早在 gpt-j（[Wang & Komatsuzaki, 2021](https://github.com/kingoflolz/mesh-transformer-jax)）等旧模型中就已出现。此外，所有使用 MLA（Multi-head Latent Attention，多头隐式注意力） 的模型都必须采用 Partial RoPE，否则推理成本将高得难以接受。
 
 MLA 通过投影吸收（projection absorption）实现高效推理：不再为每个头存储独立的键 $k_i^{(h)}$，而是缓存一个小的共享隐向量 $c_i = x_i W_c \in \mathbb{R}^{d_c}$，并将头的查询/键映射合并，使得每次打分都很廉价。令 $q_t^{(h)} = x_t W_q^{(h)}$ 与 $k_i^{(h)} = c_i E^{(h)}$，定义 $U^{(h)} = W_q^{(h)} E^{(h)}$，可得：
@@ -783,8 +782,8 @@ s_{t,i}^{(h)} = \frac{1}{\sqrt{d_k}}\bigl(x_t W_q^{(h)}\bigr)^\top
 \underbrace{R_{t-i}}_{\text{depends on }t-i}\bigl(c_i E^{(h)}\bigr)
 $$
 
-因此，你无法将 $W_q^{(h)}$ 和 $E^{(h)}$ 预先合并成一个固定的 $U^{(h)}$。  
-解决方案：部分 RoPE（Partial RoPE）。  
+因此，你无法将 $W_q^{(h)}$ 和 $E^{(h)}$ 预先合并成一个固定的 $U^{(h)}$。
+解决方案：部分 RoPE（Partial RoPE）。
 将头维度拆分为 $d_k = d_{\text{nope}} + d_{\text{rope}}$，在大块上不施加旋转（像以前一样吸收：$(x_t U_{\text{nope}}^{(h)})^\top c_i$），仅在小块上应用 RoPE。
 
 限制长上下文的注意力范围
@@ -903,7 +902,7 @@ $$
 ![Image 4: Image](https://huggingfacetb-smol-training-playbook.hf.space/_astro/Capture_decran_2025-10-20_a_13_25_47_2921384e-bcac-8087-83e5-fa7a40c1f342.asYkEXKU_1s8wtB.webp)
 
 ![Image 5: Image](https://huggingfacetb-smol-training-playbook.hf.space/_astro/Capture_decran_2025-10-20_a_13_26_08_2921384e-bcac-80b5-ac36-fb73d6374208.D-BBIjb7_Zs7nQa.webp)
-<!-- 
+<!--
 Here is a table with the sparsity of some MoE model:
 
 | Model | Total experts | Activated per token (incl. shared) | Sparsity |
@@ -924,7 +923,7 @@ Here is a table with the sparsity of some MoE model:
 | Kimi K2 | 384 routed + 1 shared = 385 | 8 routed + 1 shared = 9 | 42.8 |
 | Qwen3-Next-80B-A3B-Instruct | 512 routed + 1 shared = 513 | 10 total active + 1 shared = 11 | 46.6 |
 
-The recent trend is clear: MoE models are getting sparser. That said, the optimal sparsity still depends on hardware and end-to-end efficiency. For example, Step-3 targets peak efficiency and intentionally doesn’t max out sparsity to fit their specific hardware and bandwidth constraints, while gpt-oss-20b have a low sparsity due to on-device memory constraints (the passive expert still take some memory). -->
+The recent trend is clear: MoE models are getting sparser. That said, the optimal sparsity still depends on hardware and end-to-end efficiency. For example, Step-3 targets peak efficiency and intentionally doesn’t max out sparsity to fit their specific hardware and bandwidth constraints, while gpt-oss-20b have a low sparsity due to on-device memory constraints (the passive expert still take some memory).
 
 以下是部分 MoE 模型稀疏度对比表：
 
@@ -952,7 +951,9 @@ The recent trend is clear: MoE models are getting sparser. That said, the optima
 
 除了稀疏性（sparsity）之外，我们还需要决定每个专家（expert）应该有多大。这由“粒度”（granularity）这一指标来衡量，该指标由蚂蚁集团（Ant Group）提出。我们先明确这个术语的含义。不同论文中的术语略有差异，有些使用了稍有不同的公式。这里我们采用与所引用图表一致的定义：
 
-G=α∗d m o d e l d e x p e r t with α=2 or 4 G = \frac{\alpha*d_{model}}{d_{expert}} \text{ with } \alpha = 2 \text{ or } 4
+$$
+G = \frac{\alpha \cdot d_{\text{model}}}{d_{\text{expert}}}, \quad \alpha \in \{2, 4\}
+$$
 
 较高的粒度值意味着在（固定参数总量的情况下）使用更多但维度更小的专家。该指标是专家维度（d_{expert}）与模型维度（d_{model}）的比值。
 
@@ -1045,25 +1046,47 @@ $$
 
 线性注意力方法的核心思想是重排计算顺序，使注意力代价不再是 O(n²d)，从而在长上下文下依然可行。具体怎么做？先回顾推理时的注意力公式。为第 t 个 token 生成输出：
 
-o t=∑j=1 t exp⁡ ⁣(q t⊤k j)v j∑l=1 t exp⁡ ⁣(q t⊤k l)\mathbf{o}_{t} \;=\; \sum_{j=1}^{t} \frac{\exp\!\big(\mathbf{q}_{t}^{\top}\mathbf{k}_{j}\big) \mathbf{v}_{j}}{\sum_{l=1}^{t} \exp\!\big(\mathbf{q}_{t}^{\top}\mathbf{k}_{l}\big)} \,
+$$
+\mathbf{o}_t = \sum_{j=1}^{t} \frac{\exp\!\big(\mathbf{q}_t^\top \mathbf{k}_j\big)\mathbf{v}_j}{\sum_{l=1}^{t} \exp\!\big(\mathbf{q}_t^\top \mathbf{k}_l\big)}
+$$
+
 现在去掉 softmax：
 
-o t=∑j=1 t(q t⊤k j)v j o_t = \sum_{j=1}^{t} (q_t^\top k_j)\, v_j
+$$
+\mathbf{o}_t = \sum_{j=1}^{t} \big(\mathbf{q}_t^\top \mathbf{k}_j\big)\mathbf{v}_j
+$$
+
 重排后得到：
 
-∑j=1 t(q t⊤k j)v j=(∑j=1 t v j k j⊤)q t.\quad\sum_{j=1}^{t}(q_t^\top k_j)\,v_j = \Big(\sum_{j=1}^{t} v_j k_j^\top\Big) q_t.
+$$
+\sum_{j=1}^{t} \big(\mathbf{q}_t^\top \mathbf{k}_j\big)\mathbf{v}_j
+=
+\left(\sum_{j=1}^{t} \mathbf{v}_j \mathbf{k}_j^\top\right)\mathbf{q}_t
+$$
+
 定义运行状态（running state）：
 
-S t≜∑j=1 t k j v j⊤=K 1:t⊤V 1:t∈R d×d S_t \triangleq \sum_{j=1}^{t} k_j v_j^\top = K_{1:t}^\top V_{1:t} \in \mathbb{R}^{d\times d}
+$$
+\mathbf{S}_t \triangleq \sum_{j=1}^{t} \mathbf{v}_j \mathbf{k}_j^\top \in \mathbb{R}^{d \times d}
+$$
+
 其简单更新方式为：
 
-S t=S t−1+k t v t⊤S_t = S_{t-1} + k_t v_t^\top 
+$$
+\mathbf{S}_t = \mathbf{S}_{t-1} + \mathbf{v}_t \mathbf{k}_t^\top
+$$
+
 于是可写成：
 
-o t=S t q t=S t−1 q t+v t(k t⊤q t)o_t = S_t q_t = S_{t-1} q_t + v_t (k_t^\top q_t)
-为何重排（reordering）如此重要：左侧形式 ∑j≤t(q t⊤k j)v j\sum_{j\le t}(q_t^\top k_j)v_j 的含义是“对每个过去的 token j，计算点积 q t⊤k j q_t^\top k_j（一个标量），用它缩放 v j v_j，再把这 t 个向量相加”——在第 t 步需要约 O(t d)O(td) 的计算量。右侧形式将其重写为 (∑j≤t v j k j⊤)q t\big(\sum_{j\le t} v_j k_j^\top\big) q_t：你只需维护一个运行状态矩阵 S t=∑j≤t v j k j⊤∈R d×d S_t=\sum_{j\le t} v_j k_j^\top\in\mathbb{R}^{d\times d}，它已经汇总了所有过去的 (k j,v j)(k_j,v_j)。每遇到一个新 token，就用一次外积 v t k t⊤v_t k_t^\top 更新它，代价 O(d 2)O(d^2)，然后输出只需一次矩阵–向量乘法 S t q t S_t q_t（再花 O(d 2)O(d^2)）。因此，从头开始用左侧形式生成 T 个 token 的复杂度是 O(T 2 d)O(T^2 d)，而维护 S t S_t 并使用右侧形式只需 O(T d 2)O(T d^2)。直观地说：左侧 = “每步多次小规模点积–缩放–相加”；右侧 = “一次预先汇总的矩阵乘以查询”，把对序列长度的依赖换成了对维度的依赖。本文聚焦推理（inference）与递归形式（recurring form），但在训练（training）中它同样更高效，重排只需如下方程：
+$$
+\mathbf{o}_t = \mathbf{S}_t \mathbf{q}_t = \mathbf{S}_{t-1}\mathbf{q}_t + \mathbf{v}_t\big(\mathbf{k}_t^\top \mathbf{q}_t\big)
+$$
 
-(Q K⊤)n×n V=Q(K⊤V)d×d\underset{n\times n}{(QK^\top)}\,V \;=\; Q\,\underset{d\times d}{(K^\top V)}
+为何重排（reordering）如此重要：左侧形式表示“对每个过去的 token $j$，先算点积 $\mathbf{q}_t^\top \mathbf{k}_j$，再用它缩放 $\mathbf{v}_j$，最后把所有结果相加”，因此在第 $t$ 步需要约 $O(td)$ 的计算量。右侧形式则把它改写成“先维护一个汇总历史信息的运行状态矩阵 $\mathbf{S}_t$，再做一次矩阵乘向量”，从而把生成 $T$ 个 token 的复杂度从 $O(T^2d)$ 降到 $O(Td^2)$。本文聚焦推理（inference）与递归形式（recurring form），但在训练（training）中它同样更高效，重排只需如下方程：
+
+$$
+\underset{n \times n}{(QK^\top)}V = Q\underset{d \times d}{(K^\top V)}
+$$
 
 可以看出，这看起来已经非常类似于 RNN（循环神经网络）的结构。这样我们的问题就解决了吗？差不多。但在实践中，softmax 起到了重要的稳定作用，而朴素的线性形式如果没有某种归一化可能会不稳定。这就催生了一个实用的变体——闪电注意力（Lightning Attention） 或 范数注意力（Norm Attention）！
 
@@ -1073,18 +1096,25 @@ Lightning and norm attention（闪电注意力与范数注意力）
 
 NormAttention（范数注意力）：
 
-RMSNorm(Q(K T V))\text{RMSNorm}(Q(K^TV))
+$$
+\mathrm{RMSNorm}(Q(K^\top V))
+$$
 
 LightningAttention（闪电注意力）：
 
-Q=Silu(Q),K=Silu(K),V=Silu(V)Q= \text{Silu(Q)}, \; K = \text{Silu(K)}, \; V = \text{Silu(V)}  
-O=SRMSNorm(Q(K V T))O = \text{SRMSNorm}(Q(KV^T))
+$$
+Q = \mathrm{SiLU}(Q), \quad K = \mathrm{SiLU}(K), \quad V = \mathrm{SiLU}(V)
+$$
+
+$$
+O = \mathrm{SRMSNorm}(Q(KV^\top))
+$$
 
 根据 Minimax01 的实验，采用 Norm Attention 的混合模型在大多数任务上都能与 softmax 注意力打成平手。
 
 有趣的是，在诸如 Needle in a Haystack（NIAH，草垛寻针） 这样的检索任务上，它的表现可以远远优于完整的 softmax 注意力，这看似令人惊讶，但或许暗示了当 softmax 与线性层协同工作时，存在某种协同效应！
 
-令人意外的是，刚刚发布的 MiniMax M2 并未采用混合（hybrid）或线性注意力（linear attention）。据其 [预训练负责人](https://huggingfacetb-smol-training-playbook.hf.space/[https://x.com/zpysky1125/status/1983383094607347992](https://x.com/zpysky1125/status/1983383094607347992)) 透露，虽然早期 MiniMax M1 在较小规模、当时流行的基准（MMLU、BBH、MATH）上尝试 Lightning Attention 时表现亮眼，但在更大规模上却发现它在“复杂的多跳推理任务”中存在明显缺陷。他们还指出，RL 训练期间的数值精度问题以及基础设施成熟度是主要阻碍。他们总结道：在大规模下做架构设计是一个多变量问题，既困难又算力密集，因为它对数据分布、优化器等其他参数极其敏感……
+令人意外的是，刚刚发布的 MiniMax M2 并未采用混合（hybrid）或线性注意力（linear attention）。据其 [预训练负责人](https://x.com/zpysky1125/status/1983383094607347992) 透露，虽然早期 MiniMax M1 在较小规模、当时流行的基准（MMLU、BBH、MATH）上尝试 Lightning Attention 时表现亮眼，但在更大规模上却发现它在“复杂的多跳推理任务”中存在明显缺陷。他们还指出，RL 训练期间的数值精度问题以及基础设施成熟度是主要阻碍。他们总结道：在大规模下做架构设计是一个多变量问题，既困难又算力密集，因为它对数据分布、优化器等其他参数极其敏感……
 
 不过他们也承认，“随着 GPU 算力增长放缓而序列长度持续增加，线性和稀疏注意力（linear and sparse attention）的优势将逐步显现。” 这再次凸显了架构消融（architecture ablations）的复杂性，以及研究与生产现实之间的差距。
 
@@ -1092,13 +1122,15 @@ O=SRMSNorm(Q(K V T))O = \text{SRMSNorm}(Q(KV^T))
 
 高级线性注意力（Advanced linear attention）
 
-循环模型的一条宝贵经验是：让状态偶尔“放下过去”。在实践中，这意味着为前一状态引入一个门控（gate） G t\mathbf{G}_t：
+循环模型的一条宝贵经验是：让状态偶尔“放下过去”。在实践中，这意味着为前一状态引入一个门控（gate）$\mathbf{G}_t$：
 
-S t=G t⊙S t−1+v t k t⊤\mathbf{S}_t \;=\; \mathbf{G}_t \odot \mathbf{S}_{t-1} \;+\; \mathbf{v}_t \mathbf{k}_t^{\top}
+$$
+\mathbf{S}_t = \mathbf{G}_t \odot \mathbf{S}_{t-1} + \mathbf{v}_t \mathbf{k}_t^\top
+$$
 
-几乎所有最新的线性注意力方法都包含这种门控组件，只是 G t\mathbf{G}_t 的实现方式各异。以下是 [该论文](https://huggingfacetb-smol-training-playbook.hf.space/arxiv.org/abs/2312.06635) 列出的不同门控变体及其对应架构：
+几乎所有最新的线性注意力方法都包含这种门控组件，只是 $\mathbf{G}_t$ 的实现方式各异。以下是 [该论文](https://arxiv.org/abs/2312.06635) 列出的不同门控变体及其对应架构：
 
-<!-- 
+<!--
 | Model | Parameterization | Learnable parameters |
 | --- | --- | --- |
 | Mamba ([A. Gu & Dao, 2024](https://arxiv.org/abs/2312.00752)) | G t=exp⁡(−(1⊤α t)⊙exp⁡(A)),α t=softplus(x t W α 1 W α 2)\mathbf{G}_t = \exp(-(\mathbf{1}^\top \boldsymbol{\alpha}_t) \odot \exp(\mathbf{A})), \quad \boldsymbol{\alpha}t = \text{softplus}(\mathbf{x}t \mathbf{W}{\alpha_1} \mathbf{W}{\alpha_2}) | A∈R d k×d v,W α 1∈R d×d 16,W α 2∈R d 16×d v\mathbf{A} \in \mathbb{R}^{d_k \times d_v}, \quad \mathbf{W}{\alpha_1} \in \mathbb{R}^{d \times \frac{d}{16}}, \quad \mathbf{W}{\alpha_2} \in \mathbb{R}^{\frac{d}{16} \times d_v} |
@@ -1136,15 +1168,15 @@ S t=G t⊙S t−1+v t k t⊤\mathbf{S}_t \;=\; \mathbf{G}_t \odot \mathbf{S}_{t-
 
 我们已经了解了稠密（dense）、混合专家（MoE, Mixture of Experts）和混合（hybrid）模型，你可能自然想知道该用哪一种？架构选择通常取决于模型部署位置、团队经验以及时间线。我们快速回顾每种架构的优缺点，并给出一个简单的决策流程，帮你找到合适的架构。
 
-Dense transformers（稠密 Transformer）  
+Dense transformers（稠密 Transformer）
 标准的纯解码器 Transformer，每个 token 都会激活所有参数。数学推导见 [The Annotated Transformers](https://nlp.seas.harvard.edu/2018/04/03/attention.html)，直观理解可参考 [The Illustrated Transformers](https://jalammar.github.io/illustrated-transformer/)。
 
-优点：生态成熟、理解充分、训练稳定，单位参数性能高。  
-缺点：计算量随规模线性增长，70B 模型的成本约为 3B 模型的 23 倍。  
+优点：生态成熟、理解充分、训练稳定，单位参数性能高。
+缺点：计算量随规模线性增长，70B 模型的成本约为 3B 模型的 23 倍。
 
 在内存受限场景或 LLM 初学者手中，这通常是默认选择。
 
-Mixture of Experts (MoE，混合专家)  
+Mixture of Experts (MoE，混合专家)
 将 Transformer 中的前馈层替换为多个“专家（experts）”。对每个 token，门控网络（gating network）只把它路由到少数几个专家。结果是用一小部分计算量获得大网络的容量。例如 [Kimi K2](https://huggingface.co/moonshotai/Kimi-K2-Instruct) 总参数量 1T，但每个 token 只激活 32B。代价是所有专家都必须加载到内存。可视化指南见[这篇博客](https://newsletter.maartengrootendorst.com/p/a-visual-guide-to-mixture-of-experts)。
 
 优点：训练与推理的单位计算性能更高。
@@ -1225,7 +1257,7 @@ import numpy as np
 def compute_tokenizer_metrics(tokenizer, word_tokenizer, text):
     """
     Computes fertility and proportion of continued words.
-    
+
     Returns:
         tuple: (fertility, proportion_continued_words)
             - fertility: average tokens per word (lower is better)
@@ -1236,10 +1268,10 @@ def compute_tokenizer_metrics(tokenizer, word_tokenizer, text):
     words = word_tokenizer.word_tokenize(text)
     tokens = tokenizer.batch_encode_plus(words, add_special_tokens=False)
     tokens_per_word = np.array(list(map(len, tokens["input_ids"])))
-    
+
     fertility = np.mean(tokens_per_word).item()
     proportion_continued_words = (tokens_per_word >= 2).sum() / len(tokens_per_word)
-    
+
     return fertility, proportion_continued_words
 ```
 
@@ -1297,16 +1329,16 @@ from datatrove.utils.word_tokenizers import load_word_tokenizer
 import pandas as pd
 
 results = []
-	
+
 for tokenizer_name, tokenizer_path in tokenizers:
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_path, trust_remote_code=True)
-    
+
     for lang_name, lang_code, short_lang_code in languages:
         word_tokenizer = load_word_tokenizer(lang_code)
-        
+
         # 在 Wikipedia 上计算指标
         fertility, pcw = compute_tokenizer_metrics(tokenizer, word_tokenizer, wikis[lang_code])
-        
+
         results.append({
             "tokenizer": tokenizer_name,
             "language": lang_name,
@@ -1458,8 +1490,8 @@ Adam（Adaptive Momentum Estimation，自适应动量估计）是一种一阶（
 
 有趣的是，在过去几年里，AdamW 的超参数几乎纹丝不动：
 
-*   β₁ = 0.9，β₂ = 0.95  
-*   grad norm clipping（梯度范数裁剪）= 1.0  
+*   β₁ = 0.9，β₂ = 0.95
+*   grad norm clipping（梯度范数裁剪）= 1.0
 *   weight decay（权重衰减）= 0.1（Llama-3-405B 将其降至 0.01）
 
 从 Llama 1、2、3 到 DeepSeek-V1、2、3 671B，这三元组几乎原封不动地复用。Durk Kingma 一直是对的吗？还是我们还能做得更好？
@@ -1569,21 +1601,28 @@ DeepSeek-V2 与 V3 的技术报告中并未对这些调度变化做消融实验�
 
 对 B 个样本取平均
 
-*   批梯度：g~B=1 B∑i=1 B g~(i)\tilde{g}_{B} \;=\; \frac{1}{B}\sum_{i=1}^{B} \tilde{g}^{(i)}
-*   均值保持不变：E ⁣[g~B]=g\mathbb{E}\!\left[\tilde{g}_{B}\right] \;=\; g
-*   但协方差缩小：C o v ⁣(g~B)=Σ B\mathrm{Cov}\!\left(\tilde{g}_{B}\right) \;=\; \frac{\Sigma}{B}
+*   批梯度：$\tilde{g}_{B} = \frac{1}{B}\sum_{i=1}^{B} \tilde{g}^{(i)}$
+*   均值保持不变：$\mathbb{E}[\tilde{g}_{B}] = g$
+*   但协方差缩小：$\mathrm{Cov}(\tilde{g}_{B}) = \frac{\Sigma}{B}$
 
 SGD 参数更新为：
 
-*   Δ w=−η g~B\Delta w \;=\; -\,\eta \,\tilde{g}_{B}
+*   $\Delta w = -\eta \tilde{g}_{B}$
 
 该更新的方差与以下成正比：
 
-*   V a r(Δ w)∝η 2 Σ B\mathrm{Var}(\Delta w) \;\propto\; \eta^{2}\,\frac{\Sigma}{B}
+*   更新方差近似满足下式：
+$$
+\mathrm{Var}(\Delta w) \propto \eta^2 \frac{\Sigma}{B}
+$$
 
 因此，为了保持更新方差大致不变，如果将批量大小（batch size）缩放 k 倍，你就需要将学习率（learning rate）缩放 k\sqrt k 倍。假设你已经计算出了最优的批量大小和学习率，并且发现可以增加到临界批量大小（critical batch size）以提高吞吐量，那么你也需要相应地调整最优学习率。
 
-B critical→k B optimal⇒η critical→k η optimal B_{\text{critical}} \;\rightarrow\; kB_{\text{optimal}} \quad\Rightarrow\quad \eta_{\text{critical}} \;\rightarrow\; \sqrt{k}\eta_{\text{optimal}}
+$$
+B_{\text{critical}} \rightarrow kB_{\text{optimal}}
+\quad \Rightarrow \quad
+\eta_{\text{critical}} \rightarrow \sqrt{k}\eta_{\text{optimal}}
+$$
 
 对于 AdamW 或 Muon 这类优化器（optimizers），一个实用的经验法则是：随着批量大小增长，采用 _平方根_ _学习率缩放（square-root LR scaling）_，但这也会因优化器而异。例如，使用 AdamW 时，`beta1` / `beta2` 之间可能存在交互，导致行为差异很大。另一种务实的做法是在短时间内并行训练：保留一个原始批量的运行，同时启动一个更大批量并重新缩放学习率的运行；只有当两条损失曲线在重新缩放后对齐时，才采用更大的批量（[Merrill et al., 2025](https://arxiv.org/abs/2505.23971)）。在该论文中，他们在切换批量大小时重新预热（re-warm up）学习率并重置优化器状态。他们还设定了容差和时间窗口来判断损失是否“匹配”，这两个参数都是凭经验选择的。他们发现，B s i m p l e B_{simple} 估计值——本身也有噪声——会低估“实际”的临界批量大小。这为你提供了一种快速、低风险的检查方式，确保新的批量/学习率组合能够保留训练动态。
 
@@ -1593,7 +1632,7 @@ B critical→k B optimal⇒η critical→k η optimal B_{\text{critical}} \;\rig
 
 在实践中，可按如下方式选择批大小和学习率：
 
-*   首先，根据扩展定律（scaling laws）（见后文！）或文献，选出你认为最优的批大小和学习率。  
+*   首先，根据扩展定律（scaling laws）（见后文！）或文献，选出你认为最优的批大小和学习率。
 *   接着，可微调批大小，看能否进一步提升训练吞吐量（training throughput）。
 
 核心洞见在于：从初始批大小到关键批大小之间通常存在一个区间，你可以在此区间内增大批大小以提高硬件利用率，而无需牺牲数据效率；但必须相应地重新调节学习率。如果吞吐量提升不明显，或者测试更大的批大小（并重缩放学习率）后数据效率反而下降，那就沿用初始值即可。
@@ -1616,10 +1655,10 @@ C≈6×N×D C\approx 6×N×D
 
 那么，这与学习率（learning rate）有何关系？我们可以推导出扩展定律（scaling laws），用来预测最优学习率和批量大小（batch size）如何随总算力预算（C）变化。它们能回答如下问题：
 
-*   当我把参数量从 1B 扩展到 7B 时，学习率该如何调整？  
+*   当我把参数量从 1B 扩展到 7B 时，学习率该如何调整？
 *   如果训练数据量翻倍，我是否需要修改学习率？
 
-让我们通过 DeepSeek 采用的方法来具体看看：  
+让我们通过 DeepSeek 采用的方法来具体看看：
 首先，选定学习率调度策略，最好选用 WSD（Warm-up, Stable, Decay） 因其灵活。接着，在一系列算力预算（如 1e17、5e17、1e18、5e18、1e19、2e19 FLOPs）下，用不同的批量大小与学习率组合训练模型。简单说：用不同规模的模型、不同数量的 token 进行训练，并测试各种超参数设置。这正是 WSD 调度的优势——无需重启即可将同一次训练扩展到不同的 token 数量。
 
 对每种设置，我们在学习率和批量大小上做网格搜索（sweep），找出那些接近最优的配置，通常定义为验证损失（validation loss）与最佳值差距很小（例如 0.25% 以内）。验证损失在独立验证集上计算，其分布与训练集类似。每个近优配置提供一个数据点——一个元组（算力预算 C，最优学习率 η）或（C，最优批量大小 B）。在双对数坐标（log-log scale）下，这些关系通常呈幂律（power-law）行为，近似为直线（如上图所示）。通过拟合这些数据点，我们就能提取出描述最优超参数如何随算力演化的扩展定律。
@@ -1658,7 +1697,7 @@ C≈6×N×D C\approx 6×N×D
 
 ![图片 10：图片](https://huggingfacetb-smol-training-playbook.hf.space/_astro/Capture_decran_2025-10-27_a_22_10_05_2991384e-bcac-802a-a6e6-dab0f9f410ec.CKOEFjcT_b6hhb.webp)
 
-“再来一次消融实验不会有事的”（剧透：真有事）。感谢 [sea_snell](https://huggingfacetb-smol-training-playbook.hf.space/[https://x.com/sea_snell/status/1905163154596012238](https://x.com/sea_snell/status/1905163154596012238))
+“再来一次消融实验不会有事的”（剧透：真有事）。感谢 [sea_snell](https://x.com/sea_snell/status/1905163154596012238)
 
 完美是良好的敌人，尤其在算力预算和截止日期都有限的情况下。
 
@@ -1674,7 +1713,7 @@ C≈6×N×D C\approx 6×N×D
 
 尽管扩展定律（scaling laws）为给定算力预算下的模型规模与训练时长提供了参考，但若选择过度训练（overtrain），你就得自行决定这些因素。对于 SmolLM3，我们首先将目标模型规模定为 30 亿（3B）参数。参考近期同量级模型，如 Qwen3 4B、Gemma 3 4B 与 Llama 3.2 3B，我们认为 3B 既足以具备有意义的能力（如推理与工具调用），又足够小，可实现超快推理与高效的本地部署。为确定训练时长，我们注意到近期模型已被极度过度训练——例如，前述 Qwen3 系列据称训练了 36T（36 万亿）token！因此，训练时长往往由可用算力决定。我们大约租到了 384 张 H100，为期一个月，按约 30% 的 MFU（Model FLOPs Utilization，模型浮点利用率）估算，可支持训练 11 万亿 token。
 
-尽管存在这些偏离，扩展定律仍具实际价值：它们为实验设计提供基线，人们常用 Chinchilla-optimal（Chinchilla 最优）设置来获得消融实验的信号，并帮助预测某一模型规模能否达到目标性能。正如 de Vries 在[这篇博客](https://huggingfacetb-smol-training-playbook.hf.space/[https://www.harmdevries.com/post/model-size-vs-compute-overhead/](https://www.harmdevries.com/post/model-size-vs-compute-overhead/))中所指出的，通过缩小模型规模，你可以命中一个临界模型规模：达到给定损失所需的最小容量，低于此规模便会开始遭遇收益递减。
+尽管存在这些偏离，扩展定律仍具实际价值：它们为实验设计提供基线，人们常用 Chinchilla-optimal（Chinchilla 最优）设置来获得消融实验的信号，并帮助预测某一模型规模能否达到目标性能。正如 de Vries 在[这篇博客](https://www.harmdevries.com/post/model-size-vs-compute-overhead/)中所指出的，通过缩小模型规模，你可以命中一个临界模型规模：达到给定损失所需的最小容量，低于此规模便会开始遭遇收益递减。
 
 既然我们已经确定了模型架构、训练配置、模型规模和训练时长，接下来就必须准备两个关键组件：用于“教学”的数据配比，以及能够可靠完成训练的基础设施。SmolLM3 的参数量定为 3B，我们需要精心调配一份能在多语言、数学和代码方面带来强劲表现的数据配比，并搭建足够稳健、可支撑 11 万亿（trillion）个 token 训练的基础设施。把这些基础打牢至关重要——哪怕架构再优秀，也救不了糟糕的数据策划或不稳定的训练系统。
 
@@ -1724,9 +1763,9 @@ C≈6×N×D C\approx 6×N×D
 
 近期工作提出了自动寻找最佳数据比例的方法，包括：
 
-*   DoReMi（[Xie et al., 2023](https://arxiv.org/abs/2305.10429)）：利用一个小型代理模型（proxy model）学习域权重（domain weights），以最小化验证损失（validation loss）  
-*   Rho Loss（[Mindermann et al., 2022](https://arxiv.org/abs/2206.07137)）：基于留出损失（holdout loss）挑选单个训练样本，优先选择模型可学习、与任务相关且尚未学会的样本  
-*   RegMix（[Q. Liu et al., 2025](https://arxiv.org/abs/2407.01492)）：通过带正则化的回归（regularized regression）确定最优数据混合比例，在多个评估目标（evaluation objectives）和数据域（data domains）之间平衡性能  
+*   DoReMi（[Xie et al., 2023](https://arxiv.org/abs/2305.10429)）：利用一个小型代理模型（proxy model）学习域权重（domain weights），以最小化验证损失（validation loss）
+*   Rho Loss（[Mindermann et al., 2022](https://arxiv.org/abs/2206.07137)）：基于留出损失（holdout loss）挑选单个训练样本，优先选择模型可学习、与任务相关且尚未学会的样本
+*   RegMix（[Q. Liu et al., 2025](https://arxiv.org/abs/2407.01492)）：通过带正则化的回归（regularized regression）确定最优数据混合比例，在多个评估目标（evaluation objectives）和数据域（data domains）之间平衡性能
 
 我们在以往项目中实验了 DoReMi 和 Rho Loss，但发现它们往往收敛到大致反映数据集自然规模分布的权重，本质上就是“有什么就用更多什么”。虽然理论上很吸引人，但在我们的场景下并未胜过细致的人工消融（manual ablations）。最新的 SOTA 模型仍依赖通过系统性消融（systematic ablations）和退火实验（annealing experiments）进行人工混合调优，这也是我们在 SmolLM3 中采用的方法。
 
@@ -1788,8 +1827,8 @@ C≈6×N×D C\approx 6×N×D
 
 虽然我们是从零开始跑消融实验（ablations）来确定阶段 1 的配比，但在测试新阶段的新数据集时（本例中新增了两个阶段），我们采用了退火消融（annealing ablations）：在阶段 1 后期、约 7T tokens 处取一个检查点（checkpoint），然后跑 50B tokens 的退火实验，设置如下：
 
-*   40% 基线配比：我们当时正在训练的确切阶段 1 配比  
-*   60% 新数据集：想要评估的候选数据集  
+*   40% 基线配比：我们当时正在训练的确切阶段 1 配比
+*   60% 新数据集：想要评估的候选数据集
 
 例如，为了验证 MegaMath 能否提升数学能力，我们跑了 40% 阶段 1 配比（保持 75/12/10/3 的域切分）+ 60% MegaMath。
 
@@ -1876,26 +1915,26 @@ Checkpoint 与自动恢复系统： 确认 checkpoint 能正确保存，且训�
 
 我们仍怀疑硬件，于是决定减少节点再做测试。384 张 GPU 的规模下，任何部件都可能出故障。令人惊讶的是，无论选哪一台节点，单节点就能复现完全相同的吞吐量骤降，从而排除了硬件问题。
 
-还记得与消融实验相比改动的三处吗？  
-1. 数据存储——已通过迁到本地节点存储解决；  
-2. 硬件——已排除；  
-3. 步数（step count）——成为仅剩的变量。  
+还记得与消融实验相比改动的三处吗？
+1. 数据存储——已通过迁到本地节点存储解决；
+2. 硬件——已排除；
+3. 步数（step count）——成为仅剩的变量。
 
 我们把训练步数从 3 M 回退到 32 k，骤降幅度立刻变小；步数越大，骤降越尖锐、越频繁。
 
 为验证这一点，我们保持其余配置完全一致，仅把训练步数从 32 k 调到 3.2 M。所用配置见[此处](https://huggingface.co/datasets/HuggingFaceTB/ablations-training-configs/tree/main/throughput_debugging)：
 
-```
+```diff
 ## 短跑 (32k steps)
 - "lr_decay_starting_step": 2560000
 - "lr_decay_steps": 640000
 - "train_steps": 3200000
-```
 
 ## 长周期运行（3.2 M steps）
 + "lr_decay_starting_step": 26000
 + "lr_decay_steps": 6000
 + "train_steps": 32000
+```
 
 下图所示的结果一目了然：短周期运行只出现小幅吞吐下降，而步数越长，下降越剧烈、越频繁。因此问题不在硬件，而在软件瓶颈，很可能就在数据加载器（dataloader）！毕竟大多数其他训练组件对每个 batch 的处理与步数无关。
 
@@ -1996,7 +2035,7 @@ index 1234567..abcdefg 100644
 
 在我们的案例中，TP（Tensor Parallelism，张量并行）种子 bug 意味着我们一开始就“起跑失误”，有一半权重未被正确初始化。模型表现与 SmolLM2 类似，并在相近位置趋于平缓，这意味着我们最终可能得到性能相同、但训练成本几乎翻倍的模型。此时重启是合理的。然而，许多问题可以在训练中途“纠偏”，避免浪费算力。最常见的情况涉及 loss spikes（损失尖峰）——训练损失突然跳升，可能只是小插曲，也可能预示模型发散。
 
-正如 [Stas Bekman](https://media.istockphoto.com/id/486869012/fr/photo/ch%C3%A8vre-est-%C3%A0-nous.jpg?s=612x612&w=0&k=20&c=F26PCPZiy1P3FLZS23GWhKcQ8Buqfx8StHYoX85hq-s%3D) 在《[Machine Learning Engineering Open Book](https://github.com/stas00/ml-engineering/blob/master/training/instabilities/training-loss-patterns.md)》中所说：  
+正如 [Stas Bekman](https://media.istockphoto.com/id/486869012/fr/photo/ch%C3%A8vre-est-%C3%A0-nous.jpg?s=612x612&w=0&k=20&c=F26PCPZiy1P3FLZS23GWhKcQ8Buqfx8StHYoX85hq-s%3D) 在《[Machine Learning Engineering Open Book](https://github.com/stas00/ml-engineering/blob/master/training/instabilities/training-loss-patterns.md)》中所说：
 “训练损失曲线就像心跳图——有好的，有坏的，还有你该担心的。”
 
 损失尖峰分为两类：
@@ -2006,10 +2045,10 @@ index 1234567..abcdefg 100644
 
 虽然我们尚未完全理解训练不稳定性（training instabilities），但已知它们在大规模训练中愈发频繁。在采用保守架构与优化器（optimizer）的前提下，常见元凶包括：
 
-*   高学习率（learning rate）：会在训练早期引发不稳定，可通过降低学习率解决。  
-*   劣质数据：通常是可恢复尖峰（recoverable spikes）的主因，尽管恢复可能缓慢。这种情况可能发生在训练后期，当模型遇到低质量数据时。  
-*   数据–参数状态交互：PaLM（[Chowdhery et al., 2022](https://arxiv.org/abs/2204.02311)）观察到，尖峰往往源于特定数据批次与模型参数状态（parameter states）的组合，而不仅仅是“坏数据”。从不同检查点（checkpoint）训练同一批有问题的数据，并未复现尖峰。  
-*   糟糕的初始化：OLMo2 的最新工作（[OLMo et al., 2025](https://arxiv.org/abs/2501.00656)）表明，将缩放初始化（scaled initialisation）改为简单正态分布（均值=0，标准差=0.02）可提升稳定性。  
+*   高学习率（learning rate）：会在训练早期引发不稳定，可通过降低学习率解决。
+*   劣质数据：通常是可恢复尖峰（recoverable spikes）的主因，尽管恢复可能缓慢。这种情况可能发生在训练后期，当模型遇到低质量数据时。
+*   数据–参数状态交互：PaLM（[Chowdhery et al., 2022](https://arxiv.org/abs/2204.02311)）观察到，尖峰往往源于特定数据批次与模型参数状态（parameter states）的组合，而不仅仅是“坏数据”。从不同检查点（checkpoint）训练同一批有问题的数据，并未复现尖峰。
+*   糟糕的初始化：OLMo2 的最新工作（[OLMo et al., 2025](https://arxiv.org/abs/2501.00656)）表明，将缩放初始化（scaled initialisation）改为简单正态分布（均值=0，标准差=0.02）可提升稳定性。
 *   精度问题：虽然已无人再用 FP16 训练，但 [BLOOM](https://arxiv.org/abs/2211.05100) 发现其相比 BF16 极不稳定。
 
 在尖峰出现前，内置稳定性：
@@ -2042,13 +2081,13 @@ index 1234567..abcdefg 100644
 
 下图展示了我们3个训练阶段以及在训练过程中 web/code/math 比例的演变。每个阶段的 SmolLM3 训练配置可在[此处](https://github.com/huggingface/smollm/tree/main/text/pretraining/smollm3)获取，包含精确的数据权重。有关每个阶段背后的原理和构成的更多详细信息，请参阅数据整理部分。
 
-阶段1：基础训练（8T tokens，4k 上下文）  
+阶段1：基础训练（8T tokens，4k 上下文）
 基础阶段使用我们的核心预训练混合数据：web 数据（FineWeb-Edu、DCLM、FineWeb2、FineWeb2-HQ）、来自 The Stack v2 和 StarCoder2 的代码（code），以及来自 FineMath3+ 和 InfiWebMath3+ 的数学（math）数据。所有训练均在 4k 上下文长度下进行。
 
-阶段2：高质量注入（2T tokens，4k 上下文）  
+阶段2：高质量注入（2T tokens，4k 上下文）
 我们引入更高质量过滤后的数据集：用于代码的 Stack-Edu、用于数学的 FineMath4+ 和 InfiWebMath4+，以及用于高级数学推理的 MegaMath（我们添加了 Qwen Q&A 数据、合成重写以及文本-代码交错块）。
 
-阶段3：带推理与 Q&A 数据的学习率衰减（1.1T tokens，4k 上下文）  
+阶段3：带推理与 Q&A 数据的学习率衰减（1.1T tokens，4k 上下文）
 在学习率衰减阶段，我们进一步上采样高质量的代码和数学数据集，同时引入指令和推理数据，如 OpenMathReasoning、OpenCodeReasoning 和 OpenMathInstruct。Q&A 样本仅通过换行符拼接并分隔。
 
 #### [长上下文扩展：从 4k 到 128k tokens](https://huggingfacetb-smol-training-playbook.hf.space/#long-context-extension-from-4k-to-128k-tokens)
@@ -2069,7 +2108,7 @@ index 1234567..abcdefg 100644
 
 RoPE ABF（RoPE with Adjusted Base Frequency，带调整基频的 RoPE）： 当上下文从 4k 扩展到 32k 时，我们将 RoPE theta（基频）提高到 2M；再从 32k 扩展到 64k 时，将其提高到 5M。我们发现，使用更大的值（如 10M）会略微提升 RULER 分数，但会损害 GSM8k 等短上下文任务，因此我们保留了不影响短上下文的 5M。在此上下文扩展阶段，我们还借机进一步上采样了数学、代码和推理问答数据，并以 ChatML 格式新增了数十万个样本。
 
-YARN 外推：直达 128k  
+YARN 外推：直达 128k
 即便已在 64k 上下文上完成训练，我们仍希望 SmolLM3 在推理时能处理 128k。与其在 128k 序列上继续训练（成本过高），我们采用了 YARN（Yet Another RoPE extensioN method，又一种 RoPE 扩展方法）（[B. Peng et al., 2023](https://arxiv.org/abs/2309.00071)），它允许模型在训练长度之外进行外推。理论上，YARN 可将序列长度提升四倍。我们发现，使用 64k 检查点在 128k 上的表现优于 32k 检查点，这证实了“训练长度越接近目标推理长度，效果越好”。然而，当继续外推到 256k（从 64k 再翻四倍）时，Ruler 指标出现下降，因此我们建议将模型使用上限控制在 128k。
 
 至此，我们已完整回顾了 SmolLM3 的预训练之旅——从规划与消融实验，到最终训练运行，以及一路上的幕后挑战。
@@ -2105,14 +2144,14 @@ YARN 外推：直达 128k
 
 与预训练（pre-training）一样，后训练（post-training）也需要一个清晰的指南针，以避免浪费研究和工程周期。以下是构建思路：
 
-1. 为什么要后训练？  
+1. 为什么要后训练？
    我们在[预训练指南针](https://huggingfacetb-smol-training-playbook.hf.space/#training-compass-why--what--how)中提到的三大训练动机——研究（research）、生产（production）和战略开源（strategic open-source）——同样适用于后训练。例如，你可能在探索强化学习（RL, Reinforcement Learning）能否在现有模型中解锁新的推理能力（研究），或者出于延迟原因需要将大模型蒸馏（distill）成小模型（生产），又或者你发现针对某一特定用例尚无强大的开放模型（战略开源）。区别在于，后训练是在已有能力之上进行构建，而非从零开始创造能力。然而，在动用 GPU 之前，请先自问：
 
-   - 你真的需要后训练吗？如今许多开放权重模型在广泛任务上已能与专有模型媲美，有些甚至可通过量化（quantisation）在本地以适度算力运行。如果你只是想要一个通用助手，[Hugging Face Hub](https://huggingface.co/models) 上的现成模型可能已经满足需求。  
-   - 你是否拥有高质量、领域特定的数据？后训练最有意义的情境是：你瞄准的特定任务或领域通用模型表现不佳。有了合适的数据，你就能将模型调优，使其在你最关心的应用上输出更准确的结果。  
+   - 你真的需要后训练吗？如今许多开放权重模型在广泛任务上已能与专有模型媲美，有些甚至可通过量化（quantisation）在本地以适度算力运行。如果你只是想要一个通用助手，[Hugging Face Hub](https://huggingface.co/models) 上的现成模型可能已经满足需求。
+   - 你是否拥有高质量、领域特定的数据？后训练最有意义的情境是：你瞄准的特定任务或领域通用模型表现不佳。有了合适的数据，你就能将模型调优，使其在你最关心的应用上输出更准确的结果。
    - 你能衡量成功吗？没有明确的评估标准，你就无法知道后训练是否真的有效。
 
-2. 后训练应该达成什么？  
+2. 后训练应该达成什么？
    这取决于你的优先级：
 
 *   你想要一个指令遵循精准、几乎不跑题的模型吗？
@@ -2143,10 +2182,10 @@ YARN 外推：直达 128k
 
 后训练（post-training）的第一步——与预训练（pre-training）一样——是选定一套合适的评估（evals）。如今大多数大语言模型（LLM）都被用作助手，我们发现把目标定为“好用”比追逐[ARC-AGI](https://arcprize.org/arc-agi)这类抽象的“智能”基准更实际。那么，一个合格的助手至少需要做到：
 
-*   处理模糊指令  
-*   逐步规划  
-*   编写代码  
-*   适时调用工具  
+*   处理模糊指令
+*   逐步规划
+*   编写代码
+*   适时调用工具
 
 这些行为综合了推理、长上下文处理，以及数学、代码和工具使用等技能。参数规模小到 3B 甚至更低的模型也能当好助手，不过一旦低于 1B，性能通常会急剧下降。
 
@@ -2333,16 +2372,16 @@ YARN 外推：直达 128k
 
 在选择或设计聊天模板时，并没有放之四海而皆准的答案。实践中，我们建议先问自己几个问题：
 
-*   用户能否自定义系统角色（system role）？  
+*   用户能否自定义系统角色（system role）？
   如果用户应该能够定义自己的系统提示（例如“扮演海盗”），模板需要干净地支持这一点。
 
-*   模型是否需要工具（tools）？  
+*   模型是否需要工具（tools）？
   如果你的模型需要调用 API，模板必须能容纳工具调用及其响应的结构化输出。
 
-*   它是否是推理模型（reasoning model）？  
-  推理模型会使用类似 `<think> ... </think>` 的模板，把模型的“思考”与最终答案分开。有些模型在对话轮次中会丢弃推理 token，聊天模板需要处理这一逻辑。
+*   它是否是推理模型（reasoning model）？
+  推理模型会使用类似 ``<think>`` ... ``</think>`` 的模板，把模型的“思考”与最终答案分开。有些模型在对话轮次中会丢弃推理 token，聊天模板需要处理这一逻辑。
 
-*   能否与推理引擎（inference engines）兼容？  
+*   能否与推理引擎（inference engines）兼容？
   vLLM 和 SGLang 等推理引擎针对推理和工具提供了专用解析器[2](https://huggingfacetb-smol-training-playbook.hf.space/#user-content-fn-f2)。与这些解析器兼容能省去大量麻烦，尤其在需要一致工具调用的复杂智能体基准测试中至关重要。[3](https://huggingfacetb-smol-training-playbook.hf.space/#user-content-fn-f3)
 
 下表列出了几种流行的聊天模板，并就上述关键考量点进行了对比：
@@ -2351,7 +2390,7 @@ YARN 外推：直达 128k
 | --- | --- | --- | --- | --- | --- |
 | ChatML | ✅ | ✅ | ❌ | ✅ | 简单且适用于大多数场景。 |
 | Qwen3 | ✅ | ✅ | ✅ | ✅ | 混合推理模板 |
-| DeepSeek-R1 | ❌ | ❌ | ✅ | ✅ | 预填充 `<think>` 推理内容。 |
+| DeepSeek-R1 | ❌ | ❌ | ✅ | ✅ | 预填充 ``<think>`` 推理内容。 |
 | Llama 3 | ✅ | ✅ | ❌ | ✅ | 内置 Python 代码解释器等工具。 |
 | Gemma 3 | ✅ | ❌ | ❌ | ❌ | 系统角色自定义在首轮用户输入时定义。 |
 | Command A Reasoning | ✅ | ✅ | ✅ | ❌ | 每个模型支持多种对话模板。 |
@@ -2388,9 +2427,7 @@ flowchart LR
     T3_Input --> T3_Output1
     T3_Output1 --> Reasoning
     Reasoning --> T3_Output2_Top
-```
-
-T3_Output2_Top -->|CONTEXT WINDOW ✂️| TruncatedOutput
+    T3_Output2_Top -->|CONTEXT WINDOW ✂️| TruncatedOutput
 
     classDef input fill:#e8f5e8,stroke:#4caf50,stroke-width:2px
     classDef output fill:#e3f2fd,stroke:#2196f3,stroke-width:2px
@@ -2405,6 +2442,7 @@ T3_Output2_Top -->|CONTEXT WINDOW ✂️| TruncatedOutput
     class TruncatedOutput truncated
     class Turn1,Turn2,Turn3 subgraphStyle
     linkStyle 4 stroke:#333,stroke-width:2px,fill:#f8f9fa
+```
 
 尽管这对于推理（inference）来说是有道理的（以避免上下文爆炸），但我们得出结论，对于训练（training）而言，保留所有轮次的推理（reasoning）token对于适当地条件化模型至关重要。
 
@@ -2495,7 +2533,7 @@ print(rendered_input)
 ## </think>
 ```
 
-## 当然，即使是吸血鬼，技术有时也挺让人头疼的 # 
+> 输出示例：当然，即使是吸血鬼，技术有时也挺让人头疼的。
 
 问题在于，我们的数据样本长这样：
 
@@ -2550,7 +2588,7 @@ I'm trying to set up my iPhone, can you help?<|im_end|>
 </think>
 ```
 
-## 当然，即使是吸血鬼，技术有时也会有点挑战 
+> 输出示例：当然，即使是吸血鬼，技术有时也会有点挑战。
 
 这在 SystemChats 子集中尤其成问题，因为所有角色（personas）都是通过 `custom_instructions` 定义的，因此模型很容易在对话中途随机切换角色。这就引出了以下规则：
 
@@ -2562,7 +2600,7 @@ I'm trying to set up my iPhone, can you help?<|im_end|>
 
 在开发 [Open-R1](https://github.com/huggingface/open-r1) 的过程中，我们发现仅在单轮推理（single-turn reasoning）数据上训练基础模型会导致其无法泛化到多轮（multi-turn）场景。这并不令人意外；缺乏此类示例时，模型会在训练分布之外接受测试。
 
-为了对 SmolLM3 进行量化评估，我们借鉴了 Qwen3 的做法，他们开发了一项内部评估指标 _ThinkFollow_，随机插入 `/think` 或 `/no_think` 标签，以测试模型能否稳定切换推理模式。在我们的实现中，我们采用 Multi-IF 的提示，并检查模型是否在 `<think>` 和 `</think>` 标签内生成空或非空的思考块。不出所料，混合基线的结果显示，模型在第一轮之后几乎完全无法启用推理模式：
+为了对 SmolLM3 进行量化评估，我们借鉴了 Qwen3 的做法，他们开发了一项内部评估指标 _ThinkFollow_，随机插入 `/think` 或 `/no_think` 标签，以测试模型能否稳定切换推理模式。在我们的实现中，我们采用 Multi-IF 的提示，并检查模型是否在 ``<think>`` 和 ``</think>`` 标签内生成空或非空的思考块。不出所料，混合基线的结果显示，模型在第一轮之后几乎完全无法启用推理模式：
 
 为了修复这一能力，我们构建了一个名为 IFThink 的新数据集。基于 Multi-IF 流程，我们使用 [Tulu 3 的指令遵循子集](https://huggingface.co/datasets/allenai/tulu-3-sft-personas-instruction-following) 中的单轮指令，并利用 Qwen3-32B 将其扩展为多轮对话，同时生成可验证的指令和推理轨迹。方法如下图所示：
 
@@ -2571,21 +2609,21 @@ flowchart TD
     %% 输入
     IFEval["Tülu3 IF 数据集（Tülu3 IF Dataset）"]
     InstructionTypes["指令类型集合（Set of instruction types）"]
-    
+
     %% 英文多轮生成
     SingleTurn["单轮提示（Single turn prompt）"]
     LLM1["使用 Qwen3-32B 生成指令（Generate instructions with Qwen3-32B）"]
-    
+
     subgraph Turns ["多轮提示（Multi-turn prompts）"]
         Turn1["第 1 轮提示（Prompt @ turn 1）"]
         Turn2["第 2 轮提示（Prompt @ turn 2）"]
         Turn3["第 3 轮提示（Prompt @ turn 3）"]
     end
-    
+
     MultiTurn["使用 Qwen3-32B 生成推理轨迹（Generate reasoning traces with Qwen3-32B）"]
-    
+
     IFThink["IFThink"]
-    
+
     %% 连接
     IFEval --> SingleTurn
     IFEval --> InstructionTypes
@@ -2593,20 +2631,20 @@ flowchart TD
     InstructionTypes --> LLM1
     LLM1 --> Turn2
     LLM1 --> Turn3
-    
+
     Turn1 --> MultiTurn
     Turn2 --> MultiTurn
     Turn3 --> MultiTurn
-    
+
     MultiTurn --> IFThink
-    
+
     %% 样式
     classDef question fill:#ffd0c5
     classDef decision fill:#f9f9f9
     classDef success fill:#d1f2eb
     classDef danger fill:#fef3c7
     classDef category fill:#fef3c7
-    
+
     class IFEval,InstructionTypes question
     class SingleTurn,LLM1,MultiTurn decision
     class Turn1,Turn2,Turn3 decision
@@ -2689,9 +2727,7 @@ print(rendered_input)
 
 最终，最佳策略是经验性的：先启用打包，监控吞吐量和下游评估指标，再根据速度提升是否转化为同等或更好的模型质量进行调整。
 
----
-
-调整学习率
+### 调整学习率
 
 现在我们来看最后一个但仍十分重要的超参数：学习率（learning rate）。设得太高，训练可能发散；设得太低，收敛又会慢得痛苦。
 
@@ -2703,9 +2739,7 @@ print(rendered_input)
 
 虽然平均几分看起来不多，但如果你查看像 AIME25 这样的单个基准，会发现当学习率大于 1e-5 时性能会急剧下降。
 
----
-
-扩展 epoch 数量
+### 扩展 epoch 数量
 
 在我们的消融实验（ablations）中，我们通常只训练一个 epoch（轮次）以便快速迭代。一旦确定了合适的数据配比并调好了学习率（learning rate）等关键参数，下一步就是增加 epoch 数以进行最终训练。
 
@@ -2797,8 +2831,8 @@ GPU 熔化的谜团
 
 带评分的同策略（On-policy with grading）
 
-1. 使用你将要训练的同一个模型（same model）为同一提示生成多个候选回复。这样产生的数据是“on-policy（同策略）”的，因为它反映了模型自然输出时的分布。  
-2. 不再依赖更强的模型作为参考，而是引入一个外部评分器（external grader）：可以是验证器（verifier）或奖励模型（reward model），沿一个或多个质量维度（例如有用性或事实准确性）给回复打分。  
+1. 使用你将要训练的同一个模型（same model）为同一提示生成多个候选回复。这样产生的数据是“on-policy（同策略）”的，因为它反映了模型自然输出时的分布。
+2. 不再依赖更强的模型作为参考，而是引入一个外部评分器（external grader）：可以是验证器（verifier）或奖励模型（reward model），沿一个或多个质量维度（例如有用性或事实准确性）给回复打分。
 3. 评分器随后在候选回复之间分配偏好标签，从而生成一个更细致、更灵活的偏好数据集。
 
 随着模型不断改进，这种方法可以持续自举（bootstrapping）偏好数据，但其质量在很大程度上取决于评估器的可靠性与校准程度。
@@ -2946,11 +2980,11 @@ RLHF（Reinforcement Learning from Human Feedback，人类反馈强化学习）�
 
 这一问题可以通过引入超长完成惩罚（overlong completion penalty）来缓解，该惩罚对超过特定长度的完成进行惩罚。该惩罚由两个参数定义：最大完成长度 L<sub>max</sub> 和软惩罚缓存 L<sub>cache</sub>。这一惩罚是 DAPO 论文（[Yu et al., 2025](https://arxiv.org/abs/2503.14476)）中提出的改进之一，其本质上是应用如下奖励函数：
 $$
-R<sub>length</sub>(y) = 
-\begin{cases} 
-0, & |y| \le L_{\text{max}} - L_{\text{cache}} \\ 
-\frac{(L_{\text{max}} - L_{\text{cache}} - |y|)}{L_{\text{cache}}}, & L_{\text{max}} - L_{\text{cache}} < |y| \le L_{\text{max}} \\ 
--1, & L_{\text{max}} < |y| 
+R<sub>length</sub>(y) =
+\begin{cases}
+0, & |y| \le L_{\text{max}} - L_{\text{cache}} \\
+\frac{(L_{\text{max}} - L_{\text{cache}} - |y|)}{L_{\text{cache}}}, & L_{\text{max}} - L_{\text{cache}} < |y| \le L_{\text{max}} \\
+-1, & L_{\text{max}} < |y|
 \end{cases}
 $$
 
@@ -3023,7 +3057,7 @@ graph TD
 
 Qwen3-32B"]
     end
-    
+
     subgraph Lightweight ["轻量模型"]
         Base2["基座模型"] --> Distillation["强到弱
 
@@ -3033,11 +3067,11 @@ Qwen3-32B"]
 
 14B/8B/4B/1.7B/0.6B"]
     end
-    
+
     classDef flagshipStage fill:#ffd0c5
     classDef lightweightStage fill:#fef3c7
     classDef output fill:#f8d7da
-    
+
     class Stage1,Stage2,Stage3,Stage4 flagshipStage
     class Distillation lightweightStage
     class FlagshipOut,LightweightOut output
@@ -3138,7 +3172,7 @@ _表格显示不同精度与 GPU 代际下的理论 TFLOPs（TeraFLOPs，万亿�
 
 理解这些数字：这些理论峰值 FLOPs 代表在理想条件下所能实现的_最大计算吞吐量_，即所有计算单元满载且数据随时就绪。实际性能则高度取决于你的工作负载能否持续“喂饱”计算单元，以及你的运算能否高效映射到可用硬件。
 
-<!-- 
+<!--
 For SmolLM3, we were going to train on NVIDIA H100 80GB HBM3 GPUs, so we first wanted to test the H100’s theoretical TFLOPs specifications against real world performance. For this, we used the [SemiAnalysis GEMM benchmark](https://www.ray.so/#theme=prisma&darkMode=false&code=IyBBTUQgVklQIGltYWdlCmFsaWFzIGRydW49InN1ZG8gZG9ja2VyIHJ1biAtLXByaXZpbGVnZWQgLS1uZXR3b3JrPWhvc3QgLS1kZXZpY2U9L2Rldi9rZmQgLS1kZXZpY2U9L2Rldi9kcmkgLS1ncm91cC1hZGQgdmlkZW8gLS1jYXAtYWRkPVNZU19QVFJBQ0UgLS1zZWN1cml0eS1vcHQgc2VjY29tcD11bmNvbmZpbmVkIC0taXBjPWhvc3QgLS1zaG0tc2l6ZT0xOTI2IC0tcm0gLWl0IgpkcnVuIHNlbWlhbmFseXNpc3dvcmsvYW1kLW1hdG11bDpsYXRlc3QKRElTQUJMRV9BREROX0hJUF9MVD0wIFBZVE9SQ0hfVFVOQUJMRV9PUF9FTkFCTEVEPTEgcHl0aG9uIG1hdG11bC5weQoKI0FNRCBweXBpIG5pZ2h0bHkKZHJ1biBhbWQtbGF0ZXN0LXB5cGktbmlnaHRseS1tYXRtdWwKUFlUT1JDSF9UVU5BQkxFX09QX0VOQUJMRUQ9MSBweXRob24gbWF0bXVsLnB5CgojIEFNRCBweXBpIHN0YWJsZSBQeVRvcmNoIDIuNS4xCmRydW4gc2VtaWFuYWx5c2lzd29yay9hbWQtbGF0ZXN0LXB5cGktc3RhYmxlLW1hdG11bApQWVRPUkNIX1RVTkFCTEVfT1BfRU5BQkxFRD0xIHB5dGhvbiBtYXRtdWwucHkKCiMgTnZpZGlhIHN0YWJsZSAyNC4wOQphbGlhcyBkcnVuPSJkb2NrZXIgcnVuIC0tcm0gLWl0IC0tZ3B1cyBhbGwgLS1pcGM9aG9zdCAtLW5ldD1ob3N0IC0tc2htLXNpemU9MTkyNiIKZHJ1biBzZW1pYW5hbHlzaXN3b3JrL252aWRpYS1tYXRtdWw6bGF0ZXN0CnB5dGhvbiBtYXRtdWwucHkKCg&language=shell): it [tests throughput on real-world matrix multiplication shapes from Meta’s Llama 70B training](https://newsletter.semianalysis.com/p/mi300x-vs-h100-vs-h200-benchmark-part-1-training#general-matrix-multiply-gemm-performance). -->
 
 对于 SmolLM3，我们打算在 NVIDIA H100 80 GB HBM3 GPU 上进行训练，因此首先想验证 H100 的理论 TFLOPs 指标与真实世界性能是否一致。为此，我们使用了 [SemiAnalysis 的 GEMM 基准测试](https://www.ray.so/#theme=prisma&darkMode=false&code=IyBBTUQgVklQIGltYWdlCmFsaWFzIGRydW49InN1ZG8gZG9ja2VyIHJ1biAtLXByaXZpbGVnZWQgLS1uZXR3b3JrPWhvc3QgLS1kZXZpY2U9L2Rldi9rZmQgLS1kZXZpY2U9L2Rldi9kcmkgLS1ncm91cC1hZGQgdmlkZW8gLS1jYXAtYWRkPVNZU19QVFJBQ0UgLS1zZWN1cml0eS1vcHQgc2VjY29tcD11bmNvbmZpbmVkIC0taXBjPWhvc3QgLS1zaG0tc2l6ZT0xOTI2IC0tcm0gLWl0IgpkcnVuIHNlbWlhbmFseXNpc3dvcmsvYW1kLW1hdG11bDpsYXRlc3QKRElTQUJMRV9BREROX0hJUF9MVD0wIFBZVE9SQ0hfVFVOQUJMRV9PUF9FTkFCTEVEPTEgcHl0aG9uIG1hdG11bC5weQoKI0FNRCBweXBpIG5pZ2h0bHkKZHJ1biBhbWQtbGF0ZXN0LXB5cGktbmlnaHRseS1tYXRtdWwKUFlUT1JDSF9UVU5BQkxFX09QX0VOQUJMRUQ9MSBweXRob24gbWF0bXVsLnB5CgojIEFNRCBweXBpIHN0YWJsZSBQeVRvcmNoIDIuNS4xCmRydW4gc2VtaWFuYWx5c2lzd29yay9hbWQtbGF0ZXN0LXB5cGktc3RhYmxlLW1hdG11bApQWVRPUkNIX1RVTkFCTEVfT1BfRU5BQkxFRD0xIHB5dGhvbiBtYXRtdWwucHkKCiMgTnZpZGlhIHN0YWJsZSAyNC4wOQphbGlhcyBkcnVuPSJkb2NrZXIgcnVuIC0tcm0gLWl0IC0tZ3B1cyBhbGwgLS1pcGM9aG9zdCAtLW5ldD1ob3N0IC0tc2htLXNpemU9MTkyNiIKZHJ1biBzZW1pYW5hbHlzaXN3b3JrL252aWRpYS1tYXRtdWw6bGF0ZXN0CnB5dGhvbiBtYXRtdWwucHkKCg&language=shell)：该基准使用 Meta Llama 70B 训练中的真实矩阵乘法形状来测试吞吐。
@@ -3210,9 +3244,9 @@ ncu --set full --kernel-name "your_kernel_name" --launch-skip 0 --launch-count 1
 
 它提供了几项关键洞察：
 
-*   瓶颈识别：饱和链路（以红/橙色显示）指出数据移动受限的位置  
-*   缓存效率：L1/TEX 与 L2 缓存的命中率（hit rate）揭示内核利用内存层次结构的优劣  
-*   内存访问模式：逻辑单元与物理单元之间的数据流显示内核是否具备良好的空间/时间局部性（spatial/temporal locality）  
+*   瓶颈识别：饱和链路（以红/橙色显示）指出数据移动受限的位置
+*   缓存效率：L1/TEX 与 L2 缓存的命中率（hit rate）揭示内核利用内存层次结构的优劣
+*   内存访问模式：逻辑单元与物理单元之间的数据流显示内核是否具备良好的空间/时间局部性（spatial/temporal locality）
 *   端口利用率：即使总带宽看似未饱和，单个内存端口也可能已饱和
 
 在上面的具体示例中，可以看到内核指令如何流经内存层次结构（在我们硬件上进行 FP64 矩阵乘法的情况）：全局加载指令向 L1/TEX 缓存发起请求，可能命中或缺失，并进一步向 L2 发起请求；L2 若再次缺失，最终访问设备内存（HBM）。单元内的彩色矩形表示端口利用率；即使单个链路低于峰值运行，共享数据端口也可能已饱和。
@@ -3241,21 +3275,19 @@ H100（SXM5）GPU 的内存层次结构。[来源](https://www.aleksagordic.com/
 
 标准注意力实现是内存受限的，因为它们需要在 HBM 中实例化完整的注意力矩阵：
 
-1. 计算 `Q @ K^T` → 将 N×N 的注意力得分写入 HBM  
-2. 应用 softmax → 从 HBM 读取、计算、再写回 HBM  
-3. 乘以 V → 再次从 HBM 读取注意力得分  
+1. 计算 `Q @ K^T` → 将 N×N 的注意力得分写入 HBM
+2. 应用 softmax → 从 HBM 读取、计算、再写回 HBM
+3. 乘以 V → 再次从 HBM 读取注意力得分
 
 Flash Attention 通过融合这些操作并将中间结果保留在 SRAM 中，实现了 2–4× 的加速：
 
-* 不再一次性计算完整的注意力矩阵，而是将注意力切分成适合 SRAM 的 tile（瓦片）进行处理  
-* 中间注意力得分始终不会离开高速片上内存  
-* 仅将最终输出写回 HBM  
+* 不再一次性计算完整的注意力矩阵，而是将注意力切分成适合 SRAM 的 tile（瓦片）进行处理
+* 中间注意力得分始终不会离开高速片上内存
+* 仅将最终输出写回 HBM
 
 结果：Flash Attention 将 HBM 访问次数从 O(N²) 降至 O(N)，把一个内存受限的操作转变为更能发挥 GPU 计算能力的操作。这正是高效 kernel（内核）设计的精髓：_最小化缓慢的内存搬运，最大化快速的计算_。
 
----
-
-示例：在实践中验证我们的 HBM3 带宽
+### 示例：在实践中验证我们的 HBM3 带宽
 
 既然已经了解了内存层级结构，接下来就把理论付诸实践，在 H100 GPU 上验证实际带宽！此时，基准测试工具就显得至关重要。
 
@@ -3305,7 +3337,7 @@ roofline 本身由两条边界组成：
 
 我们可以通过观察图表被划分的两个区域来解读性能：
 
-*   Memory Bound（位于斜线边界下方）：处于该区域的 kernel 受限于内存带宽。GPU 正在等待数据，此时再提升算力也无济于事。优化应聚焦于减少内存流量，可通过算子融合（operator fusion）、改善内存访问模式或提高算术强度（arithmetic intensity）等手段实现。  
+*   Memory Bound（位于斜线边界下方）：处于该区域的 kernel 受限于内存带宽。GPU 正在等待数据，此时再提升算力也无济于事。优化应聚焦于减少内存流量，可通过算子融合（operator fusion）、改善内存访问模式或提高算术强度（arithmetic intensity）等手段实现。
 *   Compute Bound（位于水平边界下方）：处于该区域的 kernel 受限于计算吞吐。GPU 数据充足，但处理速度跟不上。优化应聚焦于算法改进，或利用 Tensor Cores 等专用硬件。
 
 achieved value（图中绘制的点）展示了你的 kernel 当前所处的位置。该点到 roofline 边界的距离即为优化空间，越靠近边界，kernel 性能越接近最优。
@@ -3326,16 +3358,16 @@ DGX H100。来源：NVIDIA
 
 本节将介绍连接 GPU 与外界的四大关键通信链路：
 
-*   GPU-CPU：CPU 如何调度任务并向 GPU 传输数据  
-*   GPU-GPU 节点内（intra-node）：同一台机器上的 GPU 如何通信  
-*   GPU-GPU 节点间（inter-node）：不同机器上的 GPU 如何通过网络通信  
-*   GPU-存储：数据如何从存储流向 GPU 内存  
+*   GPU-CPU：CPU 如何调度任务并向 GPU 传输数据
+*   GPU-GPU 节点内（intra-node）：同一台机器上的 GPU 如何通信
+*   GPU-GPU 节点间（inter-node）：不同机器上的 GPU 如何通过网络通信
+*   GPU-存储：数据如何从存储流向 GPU 内存
 
 每条链路的带宽和延迟（latency）特性各不相同，理解它们有助于定位训练管线中的瓶颈。为方便理解，我们绘制了一张简化示意图，突出最重要的组件与通信链路：
 
-带宽上限  
-CPU → GPU  
--  
+带宽上限
+CPU → GPU
+-
 GB/s
 
 AWS p5 实例设置中关键组件与通信链路的简化示意图
@@ -3442,9 +3474,9 @@ CUDA Graphs（CUDA 图）可以通过捕获一系列操作并将其作为单个�
 
 NVIDIA 的 Grace Hopper superchips（Grace Hopper 超级芯片）在 CPU-GPU 通信方面采取了与传统 x86+Hopper 系统根本不同的方法。关键改进包括：
 
-*   1:1 GPU 与 CPU 配比（对比 x86+Hopper 的 4:1），为每块 GPU 提供 3.5 倍更高的 CPU 内存带宽  
-*   NVLink-C2C 取代 PCIe Gen5 通道，提供 900 GB/s 对 128 GB/s 的带宽（GPU-CPU 互连带宽提升 7 倍）  
-*   NVLink Switch System 相比通过 PCIe Gen4 连接的 InfiniBand NDR400 网卡，GPU-GPU 互连带宽提升 9 倍  
+*   1:1 GPU 与 CPU 配比（对比 x86+Hopper 的 4:1），为每块 GPU 提供 3.5 倍更高的 CPU 内存带宽
+*   NVLink-C2C 取代 PCIe Gen5 通道，提供 900 GB/s 对 128 GB/s 的带宽（GPU-CPU 互连带宽提升 7 倍）
+*   NVLink Switch System 相比通过 PCIe Gen4 连接的 InfiniBand NDR400 网卡，GPU-GPU 互连带宽提升 9 倍
 
 更多细节请参阅 [NVIDIA Grace Hopper Superchip Architecture Whitepaper](https://download.deltacomputer.com/NVIDIA%20Grace%20Hopper%20Superchip%20Architecture%20Whitepaper.pdf)（第 11 页）。
 
@@ -3457,8 +3489,8 @@ NVIDIA 的 Grace Hopper superchips（Grace Hopper 超级芯片）在 CPU-GPU 通
 ```
 $ numactl --hardware
 node distances:
-node   0   1 
-  0:  10  32 
+node   0   1
+  0:  10  32
   1:  32  10
 ```
 
@@ -3654,7 +3686,7 @@ all-reduce 操作在单节点内表现出极佳性能，可实现 480 GB/s 的�
 
 这种超过 2 节点后近乎恒定的扩展行为，对大规模训练而言实际上非常鼓舞人心。在 3–16 节点范围内相对稳定的 320–350 GB/s 表明，依赖 all-reduce 操作的并行策略（例如数据并行（data parallelism））可以扩展到数百甚至数千个 GPU，而不会出现显著的每 GPU 带宽下降。这种对数级扩展特性是采用 8-rail 优化的胖树（fat tree）等多层网络拓扑的典型表现，其中 8 个 GPU 各自连接到独立的交换机 rail，以最大化对分带宽（bisection bandwidth）。现代前沿训练集群通常运行 100,000+ 个 GPU，正是这种稳定的扩展行为使得如此大规模的部署成为可能。
 
-在使用不同带宽链路（节点内的 NVLink 与节点间网络）时，应考虑针对每个带宽层级调整并行策略，以充分利用所有可用带宽。详见 [Ultrascale playbook](https://huggingfacetb-smol-training-playbook.hf.space/[https://huggingface.co/spaces/nanotron/ultrascale-playbook](https://huggingface.co/spaces/nanotron/ultrascale-playbook))，获取针对异构网络拓扑优化并行配置的详细指导。
+在使用不同带宽链路（节点内的 NVLink 与节点间网络）时，应考虑针对每个带宽层级调整并行策略，以充分利用所有可用带宽。详见 [Ultrascale playbook](https://huggingface.co/spaces/nanotron/ultrascale-playbook)，获取针对异构网络拓扑优化并行配置的详细指导。
 
 全对全（all-to-all）操作展现出更为显著的扩展挑战：在单节点时带宽为 344 GB/s，到 2 节点时骤降至 81 GB/s，并在更大集群中继续下滑至约 45–58 GB/s。这种更陡峭的衰减反映了全对全模式对网络的极高需求——每个 GPU 必须与跨节点的所有其他 GPU 通信，产生的网络拥塞远高于全归约（all-reduce）操作。
 
@@ -3917,7 +3949,7 @@ $ /usr/local/cuda/gds/tools/gdscheck.py -p
  =====================
  DRIVER CONFIGURATION:
  =====================
- NVMe               : Supported   
+ NVMe               : Supported
  NVMeOF             : Unsupported
  SCSI               : Unsupported
  ScaleFlux CSD      : Unsupported
@@ -4009,25 +4041,25 @@ gdsio -f /<disk_path>/gds_test.dat -d 0 -w <n_threads> -s 10G -i <io_size> -x 1 
 
 可扩展性（Scalability）：性能如何随线程数和 I/O 大小变化。这揭示了不同负载模式下的最优配置：
 
-*   小 I/O 大小（64K 到 256K）通常最大化 IOPS，但可能无法饱和带宽  
-*   大 I/O 大小（2M 到 8M）通常最大化吞吐量，但会降低 IOPS  
-*   线程数同时影响两者：更多线程可在硬件极限内提升总 IOPS 和吞吐量  
+*   小 I/O 大小（64K 到 256K）通常最大化 IOPS，但可能无法饱和带宽
+*   大 I/O 大小（2M 到 8M）通常最大化吞吐量，但会降低 IOPS
+*   线程数同时影响两者：更多线程可在硬件极限内提升总 IOPS 和吞吐量
 
 传输方式效率（Transfer Method Efficiency）：对比 GPU_DIRECT vs CPU_GPU vs CPUONLY，展示绕过 CPU 内存带来的收益：
 
-*   GPU_DIRECT：使用 RDMA（Remote Direct Memory Access，远程直接内存访问）直接将数据传输到 GPU 内存，完全绕过 CPU（延迟最低、效率最高、小操作 IOPS 最佳）  
-*   CPU_GPU：传统路径，数据先进入 CPU 内存，再拷贝到 GPU（增加 CPU 开销和内存带宽争用，降低有效 IOPS）  
-*   CPUONLY：基线，仅 CPU 参与 I/O，无 GPU 介入  
+*   GPU_DIRECT：使用 RDMA（Remote Direct Memory Access，远程直接内存访问）直接将数据传输到 GPU 内存，完全绕过 CPU（延迟最低、效率最高、小操作 IOPS 最佳）
+*   CPU_GPU：传统路径，数据先进入 CPU 内存，再拷贝到 GPU（增加 CPU 开销和内存带宽争用，降低有效 IOPS）
+*   CPUONLY：基线，仅 CPU 参与 I/O，无 GPU 介入
 
 IOPS 是每秒完成的单个 I/O 操作数，由 gdsio 输出中的 `ops / total_time` 计算得出。IOPS 对以下场景尤为关键：
 
-*   小 I/O 大小的随机访问模式  
-*   大量小文件或分散数据访问的负载  
-*   类数据库操作，此时每操作延迟比裸带宽更重要  
+*   小 I/O 大小的随机访问模式
+*   大量小文件或分散数据访问的负载
+*   类数据库操作，此时每操作延迟比裸带宽更重要
 
-*   更高的 IOPS 表示系统更能应对并发、细粒度的数据访问  
+*   更高的 IOPS 表示系统更能应对并发、细粒度的数据访问
 
-基准测试结果对比了不同线程数和 I/O 大小下的存储系统性能。热力图可视化吞吐量（GiB/s）与 IOPS 模式，揭示各存储层的最优配置。  
+基准测试结果对比了不同线程数和 I/O 大小下的存储系统性能。热力图可视化吞吐量（GiB/s）与 IOPS 模式，揭示各存储层的最优配置。
 注：当前集群配置暂不支持 GPUDirect Storage (GDS)。
 
 基准测试显示，我们的四种存储系统之间存在显著性能差异：
@@ -4210,33 +4242,36 @@ GPU 数量 = 总 FLOPs 需求 / (单 GPU 吞吐量 × 目标训练时间)
 
 在 30% 的预期 MFU 下，每块 GPU 的有效吞吐量变为：
 
-有效吞吐量 = 720×10¹² FLOPs/sec × 0.30 = 216×10¹² FLOPs/sec  
+$$
 \text{Effective Throughput} = 720 \times 10^{12} \text{ FLOPs/sec} \times 0.30 = 216 \times 10^{12} \text{ FLOPs/sec}
+$$
 
 现在代入我们的规模估算公式：
 
-GPU 数量 = 1.98×10²³ FLOPs / (216×10¹² FLOPs/sec × 4 weeks × 604,800 sec/week)  
-= 1.98×10²³ / 5.23×10²⁰ ≈ 379 GPUs  
-\text{GPU Count} = \frac{1.98 \times 10^{23} \text{ FLOPs}}{216 \times 10^{12} \text{ FLOPs/sec} \times 4 \text{ weeks} \times 604,800 \text{ sec/week}}  
-= \frac{1.98 \times 10^{23}}{5.23 \times 10^{20}} \approx 379 \text{ GPUs}
+$$
+\text{GPU Count}
+=
+\frac{1.98 \times 10^{23} \text{ FLOPs}}{216 \times 10^{12} \text{ FLOPs/sec} \times 4 \text{ weeks} \times 604{,}800 \text{ sec/week}}
+=
+\frac{1.98 \times 10^{23}}{5.23 \times 10^{20}}
+\approx 379 \text{ GPUs}
+$$
 
 这一计算指向 375–400 张 H100，我们最终拿到了 384 张 H100，这个数字与我们的并行策略非常契合，并给出了一个现实可行的 4 周时间表，同时为节点故障和重启等意外情况留出了缓冲。
 
----
-
-为什么更多 GPU 并不总是更好：阿姆达尔定律（Amdahl’s Law）在起作用
+### 为什么更多 GPU 并不总是更好：阿姆达尔定律（Amdahl’s Law）在起作用
 
 这里有一个反直觉的事实：增加 GPU 实际上可能让你的训练变慢。这就是 [阿姆达尔定律](https://en.wikipedia.org/wiki/Amdahl%27s_law) 登场的地方。
 
 阿姆达尔定律指出，并行化带来的加速从根本上受限于工作负载中串行（不可并行）部分的比例。在 LLM 训练中，这部分“串行”主要是通信开销：在 GPU 之间同步梯度/权重/激活所花费的时间，这部分无法通过并行化消除（更多阅读见[此处](https://acenet-arc.github.io/ACENET_Summer_School_General/05-performance/index.html)）。
 
-公式为：  
+公式为：
 最大加速比 = 1 / (串行比例 + 并行比例 / 处理器数量)
 
 对于 SmolLM3 的 3B 模型，如果通信占用每一步 10 % 的时间，那么无论你增加多少 GPU，都无法获得超过 10 倍的加速。更糟的是，随着 GPU 数量增加，通信占比往往还会上升，因为：
 
-* 更多 GPU = 更多 AllReduce 参与者 = 更长的同步时间  
-* 网络延迟/带宽成为瓶颈  
+* 更多 GPU = 更多 AllReduce 参与者 = 更长的同步时间
+* 网络延迟/带宽成为瓶颈
 * 小模型无法把通信隐藏在计算背后
 
 对于 SmolLM3，我们采用了弱扩展（weak scaling）原则：全局批次大小（global batch size）随 GPU 数量线性扩展，保持每块 GPU 约 8K 个 token。这样既能维持通信与计算的合理比例，又能最大化吞吐量。
@@ -4258,23 +4293,25 @@ GPU 数量 = 1.98×10²³ FLOPs / (216×10¹² FLOPs/sec × 4 weeks × 604,800 s
 既然我们已经通过某种形式的并行（parallelism）确认模型可以放进显存，接下来就要确定如何把全局批次大小（Global Batch Size，GBS）做到约 200 万个 token。这一约束给出了第一个等式：
 
 $$
-GBS=DP×MBS×GRAD_ACC×SEQLEN≈2 M tokens\text{GBS} = \text{DP} \times \text{MBS} \times \text{GRAD\_ACC} \times \text{SEQLEN} \approx 2\text{M tokens}
+\text{GBS} = \text{DP} \times \text{MBS} \times \text{GRAD\_ACC} \times \text{SEQLEN} \approx 2\text{M tokens}
 $$
 
 其中：
 
-*   DP（Data Parallelism，数据并行）：数据并行副本的数量  
-*   MBS（Micro Batch Size，微批次大小）：每个 GPU 在每个微批次中处理的 token 数  
-*   GRAD_ACC（Gradient Accumulation，梯度累积）：在优化器更新前执行的 forward-backward 次数  
+*   DP（Data Parallelism，数据并行）：数据并行副本的数量
+*   MBS（Micro Batch Size，微批次大小）：每个 GPU 在每个微批次中处理的 token 数
+*   GRAD_ACC（Gradient Accumulation，梯度累积）：在优化器更新前执行的 forward-backward 次数
 *   SEQLEN（Sequence Length，序列长度）：每条序列的 token 数（第一阶段预训练为 4096）
 
 我们还受到 384 张 H100 的硬件约束：
 
-DP×TP×PP=384=2 7×3\text{DP} \times \text{TP} \times \text{PP} = 384 = 2^7 \times 3
+$$
+\text{DP} \times \text{TP} \times \text{PP} = 384 = 2^7 \times 3
+$$
 
 其中：
 
-*   TP（Tensor Parallelism，张量并行）：每个模型层所用的 GPU 数（拆分权重矩阵）  
+*   TP（Tensor Parallelism，张量并行）：每个模型层所用的 GPU 数（拆分权重矩阵）
 *   PP（Pipeline Parallelism，流水线并行）：模型深度方向上的 GPU 数（纵向拆分层）
 
 这两个等式共同定义了我们的搜索空间。我们需要在满足双重约束的同时，找到能最大化训练吞吐量的取值。
@@ -4289,11 +4326,11 @@ DP×TP×PP=384=2 7×3\text{DP} \times \text{TP} \times \text{PP} = 384 = 2^7 \ti
 
 鉴于步骤 2 的约束，我们需要在以下参数范围内进行搜索：
 
-*   带 ZeRO 变体的 DP（ZeRO-0、ZeRO-1、ZeRO-3）：取值 1 到 384，且需为 2 和/或 3 的倍数  
-*   TP（1、2、3、4、6、8）：限制在单节点内，以充分利用 NVLink 的高带宽  
-*   PP（1..48）：将模型深度拆分到多张 GPU  
-*   MBS（2、3、4、5）：根据并行带来的内存节省，可增大 MBS 以更好地利用 Tensor Core  
-*   激活检查点（Activation checkpointing）（无、选择性、完整）：用额外计算换取内存与通信的减少  
+*   带 ZeRO 变体的 DP（ZeRO-0、ZeRO-1、ZeRO-3）：取值 1 到 384，且需为 2 和/或 3 的倍数
+*   TP（1、2、3、4、6、8）：限制在单节点内，以充分利用 NVLink 的高带宽
+*   PP（1..48）：将模型深度拆分到多张 GPU
+*   MBS（2、3、4、5）：根据并行带来的内存节省，可增大 MBS 以更好地利用 Tensor Core
+*   激活检查点（Activation checkpointing）（无、选择性、完整）：用额外计算换取内存与通信的减少
 *   内核优化（Kernel optimizations）：在可用处启用 CUDA Graph 与优化内核
 
 尽管组合数量看似庞大，一个实用的做法是先独立测试每个维度，然后剔除那些明显拖慢吞吐量的配置。关键洞见在于：并非所有并行策略都生而平等。有些策略引入的通信开销远超其收益，尤其在我们这种规模下。
@@ -4551,7 +4588,7 @@ Pretraining at scale（规模化预训练）。 我们介绍了 Training Compass
 138.   Yen, H., Gao, T., Hou, M., Ding, K., Fleischer, D., Izsak, P., Wasserblat, M., & Chen, D. (2025). _HELMET: How to Evaluate Long-Context Language Models Effectively and Thoroughly_. [https://arxiv.org/abs/2410.02694](https://arxiv.org/abs/2410.02694) back: [1](https://huggingfacetb-smol-training-playbook.hf.space/#refctx-bib-helmet-1), [2](https://huggingfacetb-smol-training-playbook.hf.space/#refctx-bib-helmet-2)
 139.   Yu, Q., Zhang, Z., Zhu, R., Yuan, Y., Zuo, X., Yue, Y., Dai, W., Fan, T., Liu, G., Liu, L., Liu, X., Lin, H., Lin, Z., Ma, B., Sheng, G., Tong, Y., Zhang, C., Zhang, M., Zhang, W., … Wang, M. (2025). _DAPO: An Open-Source LLM Reinforcement Learning System at Scale_. [https://arxiv.org/abs/2503.14476](https://arxiv.org/abs/2503.14476)[](https://huggingfacetb-smol-training-playbook.hf.space/#refctx-bib-dapo-1)
 140.   Yuan, J., Gao, H., Dai, D., Luo, J., Zhao, L., Zhang, Z., Xie, Z., Wei, Y. X., Wang, L., Xiao, Z., Wang, Y., Ruan, C., Zhang, M., Liang, W., & Zeng, W. (2025). _Native Sparse Attention: Hardware-Aligned and Natively Trainable Sparse Attention_. [https://arxiv.org/abs/2502.11089](https://arxiv.org/abs/2502.11089)[](https://huggingfacetb-smol-training-playbook.hf.space/#refctx-bib-nsa-1)
-141.   Yue, Y., Chen, Z., Lu, R., Zhao, A., Wang, Z., Yue, Y., Song, S., & Huang, G. (2025). _Does Reinforcement Learning Really Incentivize Reasoning Capacity in LLMs Beyond the Base Model?_[https://arxiv.org/abs/2504.13837](https://arxiv.org/abs/2504.13837)[](https://huggingfacetb-smol-training-playbook.hf.space/#refctx-bib-yue2025-1)
+141.   Yue, Y., Chen, Z., Lu, R., Zhao, A., Wang, Z., Yue, Y., Song, S., & Huang, G. (2025). _Does Reinforcement Learning Really Incentivize Reasoning Capacity in LLMs Beyond the Base Model?_ [https://arxiv.org/abs/2504.13837](https://arxiv.org/abs/2504.13837)[](https://huggingfacetb-smol-training-playbook.hf.space/#refctx-bib-yue2025-1)
 142.   Zhao, Y., Qu, Y., Staniszewski, K., Tworkowski, S., Liu, W., Miłoś, P., Wu, Y., & Minervini, P. (2024). Analysing The Impact of Sequence Composition on Language Model Pre-Training. _Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers)_, 7897–7912. [10.18653/v1/2024.acl-long.427](https://doi.org/10.18653/v1/2024.acl-long.427)[](https://huggingfacetb-smol-training-playbook.hf.space/#refctx-bib-zhao2024-1)
 143.   Zhou, F., Wang, Z., Ranjan, N., Cheng, Z., Tang, L., He, G., Liu, Z., & Xing, E. P. (2025). _MegaMath: Pushing the Limits of Open Math Corpora_. [https://arxiv.org/abs/2504.02807](https://arxiv.org/abs/2504.02807)[](https://huggingfacetb-smol-training-playbook.hf.space/#refctx-bib-zhou2025megamathpushinglimitsopen-1)
 144.   Zhou, J., Lu, T., Mishra, S., Brahma, S., Basu, S., Luan, Y., Zhou, D., & Hou, L. (2023). _Instruction-Following Evaluation for Large Language Models_. [https://arxiv.org/abs/2311.07911](https://arxiv.org/abs/2311.07911)[](https://huggingfacetb-smol-training-playbook.hf.space/#refctx-bib-ifeval-1)
