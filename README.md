@@ -923,7 +923,7 @@ Here is a table with the sparsity of some MoE model:
 | Kimi K2 | 384 routed + 1 shared = 385 | 8 routed + 1 shared = 9 | 42.8 |
 | Qwen3-Next-80B-A3B-Instruct | 512 routed + 1 shared = 513 | 10 total active + 1 shared = 11 | 46.6 |
 
-The recent trend is clear: MoE models are getting sparser. That said, the optimal sparsity still depends on hardware and end-to-end efficiency. For example, Step-3 targets peak efficiency and intentionally doesn’t max out sparsity to fit their specific hardware and bandwidth constraints, while gpt-oss-20b have a low sparsity due to on-device memory constraints (the passive expert still take some memory). -->
+The recent trend is clear: MoE models are getting sparser. That said, the optimal sparsity still depends on hardware and end-to-end efficiency. For example, Step-3 targets peak efficiency and intentionally doesn’t max out sparsity to fit their specific hardware and bandwidth constraints, while gpt-oss-20b have a low sparsity due to on-device memory constraints (the passive expert still take some memory).
 
 以下是部分 MoE 模型稀疏度对比表：
 
@@ -2379,7 +2379,7 @@ YARN 外推：直达 128k
   如果你的模型需要调用 API，模板必须能容纳工具调用及其响应的结构化输出。
 
 *   它是否是推理模型（reasoning model）？
-  推理模型会使用类似 `<think> ... </think>` 的模板，把模型的“思考”与最终答案分开。有些模型在对话轮次中会丢弃推理 token，聊天模板需要处理这一逻辑。
+  推理模型会使用类似 ``<think>`` ... ``</think>`` 的模板，把模型的“思考”与最终答案分开。有些模型在对话轮次中会丢弃推理 token，聊天模板需要处理这一逻辑。
 
 *   能否与推理引擎（inference engines）兼容？
   vLLM 和 SGLang 等推理引擎针对推理和工具提供了专用解析器[2](https://huggingfacetb-smol-training-playbook.hf.space/#user-content-fn-f2)。与这些解析器兼容能省去大量麻烦，尤其在需要一致工具调用的复杂智能体基准测试中至关重要。[3](https://huggingfacetb-smol-training-playbook.hf.space/#user-content-fn-f3)
@@ -2390,7 +2390,7 @@ YARN 外推：直达 128k
 | --- | --- | --- | --- | --- | --- |
 | ChatML | ✅ | ✅ | ❌ | ✅ | 简单且适用于大多数场景。 |
 | Qwen3 | ✅ | ✅ | ✅ | ✅ | 混合推理模板 |
-| DeepSeek-R1 | ❌ | ❌ | ✅ | ✅ | 预填充 `<think>` 推理内容。 |
+| DeepSeek-R1 | ❌ | ❌ | ✅ | ✅ | 预填充 ``<think>`` 推理内容。 |
 | Llama 3 | ✅ | ✅ | ❌ | ✅ | 内置 Python 代码解释器等工具。 |
 | Gemma 3 | ✅ | ❌ | ❌ | ❌ | 系统角色自定义在首轮用户输入时定义。 |
 | Command A Reasoning | ✅ | ✅ | ✅ | ❌ | 每个模型支持多种对话模板。 |
@@ -2427,9 +2427,7 @@ flowchart LR
     T3_Input --> T3_Output1
     T3_Output1 --> Reasoning
     Reasoning --> T3_Output2_Top
-```
-
-T3_Output2_Top -->|CONTEXT WINDOW ✂️| TruncatedOutput
+    T3_Output2_Top -->|CONTEXT WINDOW ✂️| TruncatedOutput
 
     classDef input fill:#e8f5e8,stroke:#4caf50,stroke-width:2px
     classDef output fill:#e3f2fd,stroke:#2196f3,stroke-width:2px
@@ -2444,6 +2442,7 @@ T3_Output2_Top -->|CONTEXT WINDOW ✂️| TruncatedOutput
     class TruncatedOutput truncated
     class Turn1,Turn2,Turn3 subgraphStyle
     linkStyle 4 stroke:#333,stroke-width:2px,fill:#f8f9fa
+```
 
 尽管这对于推理（inference）来说是有道理的（以避免上下文爆炸），但我们得出结论，对于训练（training）而言，保留所有轮次的推理（reasoning）token对于适当地条件化模型至关重要。
 
@@ -2601,7 +2600,7 @@ I'm trying to set up my iPhone, can you help?<|im_end|>
 
 在开发 [Open-R1](https://github.com/huggingface/open-r1) 的过程中，我们发现仅在单轮推理（single-turn reasoning）数据上训练基础模型会导致其无法泛化到多轮（multi-turn）场景。这并不令人意外；缺乏此类示例时，模型会在训练分布之外接受测试。
 
-为了对 SmolLM3 进行量化评估，我们借鉴了 Qwen3 的做法，他们开发了一项内部评估指标 _ThinkFollow_，随机插入 `/think` 或 `/no_think` 标签，以测试模型能否稳定切换推理模式。在我们的实现中，我们采用 Multi-IF 的提示，并检查模型是否在 `<think>` 和 `</think>` 标签内生成空或非空的思考块。不出所料，混合基线的结果显示，模型在第一轮之后几乎完全无法启用推理模式：
+为了对 SmolLM3 进行量化评估，我们借鉴了 Qwen3 的做法，他们开发了一项内部评估指标 _ThinkFollow_，随机插入 `/think` 或 `/no_think` 标签，以测试模型能否稳定切换推理模式。在我们的实现中，我们采用 Multi-IF 的提示，并检查模型是否在 ``<think>`` 和 ``</think>`` 标签内生成空或非空的思考块。不出所料，混合基线的结果显示，模型在第一轮之后几乎完全无法启用推理模式：
 
 为了修复这一能力，我们构建了一个名为 IFThink 的新数据集。基于 Multi-IF 流程，我们使用 [Tulu 3 的指令遵循子集](https://huggingface.co/datasets/allenai/tulu-3-sft-personas-instruction-following) 中的单轮指令，并利用 Qwen3-32B 将其扩展为多轮对话，同时生成可验证的指令和推理轨迹。方法如下图所示：
 
