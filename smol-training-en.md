@@ -3999,20 +3999,22 @@ For SmolLM3, our calculation looked like this:
 
 First, we calculate total FLOPs needed using the standard transformer approximation of**6N FLOPs per token**(where N = parameters):
 
-Total FLOPs=6×3×10 9 params×11×10 12 tokens=1.98×10 23 FLOPs\text{Total FLOPs} = 6 \times 3 \times 10^9 \text{ params} \times 11 \times 10^{12} \text{ tokens} = 1.98 \times 10^{23} \text{ FLOPs}
+$$\text{Total FLOPs} = 6 \times 3 \times 10^9 \text{ params} \times 11 \times 10^{12} \text{ tokens} = 1.98 \times 10^{23} \text{ FLOPs}$$
 With our expected MFU of 30%, our effective per-GPU throughput becomes:
 
-Effective Throughput=720×10 12 FLOPs/sec×0.30=216×10 12 FLOPs/sec\text{Effective Throughput} = 720 \times 10^{12} \text{ FLOPs/sec} \times 0.30 = 216 \times 10^{12} \text{ FLOPs/sec}
+$$\text{Effective Throughput} = 720 \times 10^{12} \text{ FLOPs/sec} \times 0.30 = 216 \times 10^{12} \text{ FLOPs/sec}$$
 Now plugging into our sizing formula:
 
-GPU Count=1.98×10 23 FLOPs 216×10 12 FLOPs/sec×4 weeks×604,800 sec/week\text{GPU Count} = \frac{1.98 \times 10^{23} \text{ FLOPs}}{216 \times 10^{12} \text{ FLOPs/sec} \times 4 \text{ weeks} \times 604,800 \text{ sec/week}}=1.98×10 23 5.23×10 20≈379 GPUs= \frac{1.98 \times 10^{23}}{5.23 \times 10^{20}} \approx 379 \text{ GPUs}
+$$\text{GPU Count} = \frac{1.98 \times 10^{23} \text{ FLOPs}}{216 \times 10^{12} \text{ FLOPs/sec} \times 4 \text{ weeks} \times 604{,}800 \text{ sec/week}} = \frac{1.98 \times 10^{23}}{5.23 \times 10^{20}} \approx 379 \text{ GPUs}$$
 This calculation pointed us toward 375-400 H100s, and we secured 384 H100s, a number that aligned well with our parallelism strategy and gave us a realistic 4-week timeline with some buffer for unexpected issues like node failures and restarts.
 #### Why More GPUs Isn’t Always Better: Amdahl’s Law in Action
 Here’s a counterintuitive truth:**adding more GPUs can actually make your training slower** . This is where [Amdahl’s Law](https://en.wikipedia.org/wiki/Amdahl%27s_law) comes into play.
 
 Amdahl’s Law states that the speedup from parallelization is fundamentally limited by the serial (non-parallelizable) portion of your workload. In LLM training, this “serial” portion is primarily**communication overhead:** the time spent synchronizing gradients/weights/activations across GPUs that can’t be parallelized away (read more[here](https://acenet-arc.github.io/ACENET_Summer_School_General/05-performance/index.html)).
 
-The formula is:**Maximum Speedup = 1 / (Serial Fraction + Parallel Fraction / Number of Processors)**
+The formula is:
+
+$$\text{Maximum Speedup} = \frac{1}{\text{Serial Fraction} + \frac{\text{Parallel Fraction}}{\text{Number of Processors}}}$$
 
 For SmolLM3’s 3B model, if communication takes 10% of each training step, then no matter how many GPUs you add, you’ll never get more than 10x speedup. Worse, as you add more GPUs, the communication fraction often _increases_ because:
 
@@ -4038,9 +4040,7 @@ The results show we’re pushing close to the 80GB limit. This means we need som
 
 Now that we know the model fits in memory with some form of parallelism, we need to determine how to achieve our target global batch size (GBS) of approximately 2 million tokens. This constraint gives us our first equation:
 
-$$
-\text{GBS} = \text{DP} \times \text{MBS} \times \text{GRAD\_ACC} \times \text{SEQLEN} \approx 2\text{M tokens}
-$$
+$$\text{GBS} = \text{DP} \times \text{MBS} \times \text{GradAcc} \times \text{SEQLEN} \approx 2\text{M tokens}$$
 Where:
 
 *   **DP (Data Parallelism)** : Number of data-parallel replicas
@@ -4050,7 +4050,7 @@ Where:
 
 We also have a hardware constraint from our 384 H100s:
 
-DP×TP×PP=384=2 7×3\text{DP} \times \text{TP} \times \text{PP} = 384 = 2^7 \times 3
+$$\text{DP} \times \text{TP} \times \text{PP} = 384 = 2^7 \times 3$$
 Where:
 
 *   **TP (Tensor Parallelism)** : GPUs per model layer (splits weight matrices)

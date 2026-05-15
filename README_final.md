@@ -4176,10 +4176,7 @@ $$\text{Effective Throughput} = 720 \times 10^{12} \text{ FLOPs/sec} \times 0.30
 
 GPU 数量 = 1.98×10²³ FLOPs / (216×10¹² FLOPs/sec × 4 weeks × 604,800 sec/week)
 = 1.98×10²³ / 5.23×10²⁰ ≈ 379 GPUs
-$$
-\text{GPU Count} = \frac{1.98 \times 10^{23} \text{ FLOPs}}{216 \times 10^{12} \text{ FLOPs/sec} \times 4 \text{ weeks} \times 604,800 \text{ sec/week}}
-= \frac{1.98 \times 10^{23}}{5.23 \times 10^{20}} \approx 379 \text{ GPUs}
-$$
+$$\text{GPU Count} = \frac{1.98 \times 10^{23} \text{ FLOPs}}{216 \times 10^{12} \text{ FLOPs/sec} \times 4 \text{ weeks} \times 604,800 \text{ sec/week}} = \frac{1.98 \times 10^{23}}{5.23 \times 10^{20}} \approx 379 \text{ GPUs}$$
 
 这一计算指向 375–400 张 H100，我们最终拿到了 384 张 H100，这个数字与我们的并行策略非常契合，并给出了一个现实可行的 4 周时间表，同时为节点故障和重启等意外情况留出了缓冲。
 
@@ -4217,7 +4214,7 @@ $$\text{最大加速比} = \frac{1}{\text{串行比例} + \frac{\text{并行比�
 
 既然我们已经通过某种形式的并行（parallelism）确认模型可以放进显存，接下来就要确定如何把全局批次大小（Global Batch Size，GBS）做到约 200 万个 token。这一约束给出了第一个等式：
 
-$$\text{GBS} = \text{DP} \times \text{MBS} \times \text{GRAD\_ACC} \times \text{SEQLEN} \approx 2\text{M tokens}$$
+$$\text{GBS} = \text{DP} \times \text{MBS} \times \text{GradAcc} \times \text{SEQLEN} \approx 2\text{M tokens}$$
 
 其中：
 

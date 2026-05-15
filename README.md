@@ -2847,7 +2847,7 @@ GPU 熔化的谜团
 2.  用一个较弱或基线模型生成一条回复，再用高性能模型生成另一条。
 3.  将强模型的输出标记为被选回复 y c y_c，弱模型的输出标记为被拒回复 y r y_r。
 
-这样就得到了一组“强 vs. 弱”的对比数据 ({x,y c,y r})(\lbrace{x,y_c,y_r\rbrace})，构建简单，因为我们假设强模型的回复总是更好。
+这样就得到了一组”强 vs. 弱”的对比数据 $\{x, y_c, y_r\}$，构建简单，因为我们假设强模型的回复总是更好。
 
 下面是一个来自 Intel 的热门示例：他们取了一个由 gpt-3.5 和 gpt-4 回复组成的 SFT 数据集，把 gpt-4 的回复作为被选，gpt-3.5 的作为被拒，从而将其转换成偏好数据集：
 
@@ -3050,18 +3050,6 @@ Smollm3 在 AIME25 上使用 RLVR 的下游性能。
 在开源生态中，GRPO 和 REINFORCE 等强化学习方法最为常用，不过 Qwen3 技术报告（[A. Yang, Li, et al., 2025](https://arxiv.org/abs/2505.09388)）强调了使用 on-policy distillation（同策略蒸馏）来训练 32B 以下参数的模型：
 
 ```mermaid
-flowchart LR
-    subgraph Flagship ["旗舰模型"]
-        Base1["Base Models"] --> Stage1["Stage 1:
-
-Long-CoT Cold Start"]
-        Stage1 --> Stage2["Stage 2:
-
-Reasoning RL"]
-        Stage2 --> Stage3["Stage 3:
-```
-
-```mermaid
 graph TD
     subgraph Flagship ["旗舰模型"]
         Stage1["阶段 1：
@@ -3180,7 +3168,7 @@ GPU 计算的基本单元是 Streaming Multiprocessors（SMs，流式多处理�
 
 下表展示了不同 NVIDIA GPU 代际在各精度下的理论峰值性能：
 
-| Precision\GPU Type | A100 | H100 | H200 | B100 | B200 |
+| Precision/GPU Type | A100 | H100 | H200 | B100 | B200 |
 | --- | --- | --- | --- | --- | --- |
 | FP64 | 9.7 | 34 | 34 | 40 | 40 |
 | FP32 | 19.5 | 67 | 67 | 80 | 80 |
@@ -4264,20 +4252,11 @@ GPU 数量 = 总 FLOPs 需求 / (单 GPU 吞吐量 × 目标训练时间)
 
 在 30% 的预期 MFU 下，每块 GPU 的有效吞吐量变为：
 
-$$
-\text{Effective Throughput} = 720 \times 10^{12} \text{ FLOPs/sec} \times 0.30 = 216 \times 10^{12} \text{ FLOPs/sec}
-$$
+$$\text{Effective Throughput} = 720 \times 10^{12} \text{ FLOPs/sec} \times 0.30 = 216 \times 10^{12} \text{ FLOPs/sec}$$
 
 现在代入我们的规模估算公式：
 
-$$
-\text{GPU Count}
-=
-\frac{1.98 \times 10^{23} \text{ FLOPs}}{216 \times 10^{12} \text{ FLOPs/sec} \times 4 \text{ weeks} \times 604{,}800 \text{ sec/week}}
-=
-\frac{1.98 \times 10^{23}}{5.23 \times 10^{20}}
-\approx 379 \text{ GPUs}
-$$
+$$\text{GPU Count} = \frac{1.98 \times 10^{23} \text{ FLOPs}}{216 \times 10^{12} \text{ FLOPs/sec} \times 4 \text{ weeks} \times 604{,}800 \text{ sec/week}} = \frac{1.98 \times 10^{23}}{5.23 \times 10^{20}} \approx 379 \text{ GPUs}$$
 
 这一计算指向 375–400 张 H100，我们最终拿到了 384 张 H100，这个数字与我们的并行策略非常契合，并给出了一个现实可行的 4 周时间表，同时为节点故障和重启等意外情况留出了缓冲。
 
@@ -4314,9 +4293,7 @@ $$
 
 既然我们已经通过某种形式的并行（parallelism）确认模型可以放进显存，接下来就要确定如何把全局批次大小（Global Batch Size，GBS）做到约 200 万个 token。这一约束给出了第一个等式：
 
-$$
-\text{GBS} = \text{DP} \times \text{MBS} \times \text{GRAD\_ACC} \times \text{SEQLEN} \approx 2\text{M tokens}
-$$
+$$\text{GBS} = \text{DP} \times \text{MBS} \times \text{GradAcc} \times \text{SEQLEN} \approx 2\text{M tokens}$$
 
 其中：
 
@@ -4327,9 +4304,7 @@ $$
 
 我们还受到 384 张 H100 的硬件约束：
 
-$$
-\text{DP} \times \text{TP} \times \text{PP} = 384 = 2^7 \times 3
-$$
+$$\text{DP} \times \text{TP} \times \text{PP} = 384 = 2^7 \times 3$$
 
 其中：
 
